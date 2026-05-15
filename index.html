@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>The Farm Report</title>
+<title>The Farm Report DEV</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   :root {
@@ -83,7 +83,7 @@
 <body>
 
 <header>
-  <div class="logo"><span>The Farm</span> Report</div>
+  <div class="logo"><span>The Farm</span> Report <span style="font-size:0.7rem;background:var(--yellow);color:#050d16;padding:2px 8px;border-radius:4px;margin-left:8px;vertical-align:middle">DEV</span></div>
   <div class="header-right">
     <select class="season-sel" id="seasonSel" onchange="onSeasonChange()">
       <option value="2026">Season 2026</option>
@@ -230,10 +230,12 @@ async function fetchAllLevels(buildUrl) {
   var allSplits = [];
   for (var i = 0; i < SPORT_IDS.length; i++) {
     try {
-      var r = await proxiedFetch(buildUrl(SPORT_IDS[i]));
-      if (!r.ok) continue;
+      var url = buildUrl(SPORT_IDS[i]);
+      var r = await proxiedFetch(url);
+      if (!r.ok) { console.log('SportId '+SPORT_IDS[i]+' not ok: '+r.status); continue; }
       var d = await r.json();
       var splits = d.stats && d.stats[0] && d.stats[0].splits ? d.stats[0].splits : [];
+      console.log('SportId '+SPORT_IDS[i]+': '+splits.length+' splits'+(splits.length>0?' ('+splits[0].team.name+')':''));
       splits.forEach(function(s) {
         var teamId = s.team && s.team.id ? s.team.id : 'x'+i;
         if (!seen[teamId]) {
@@ -241,8 +243,9 @@ async function fetchAllLevels(buildUrl) {
           allSplits.push(s);
         }
       });
-    } catch(e) {}
+    } catch(e) { console.log('SportId '+SPORT_IDS[i]+' error: '+e.message); }
   }
+  console.log('Total splits collected: '+allSplits.length);
   return allSplits;
 }
 
