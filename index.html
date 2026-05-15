@@ -226,26 +226,23 @@ var SPORT_IDS = [1,11,12,13,14,15,16];
 function proxiedFetch(url) { return fetch(url); }
 
 async function fetchAllLevels(buildUrl) {
-  var results = await Promise.all(SPORT_IDS.map(async function(sid) {
-    try {
-      var r = await proxiedFetch(buildUrl(sid));
-      if (!r.ok) return [];
-      var d = await r.json();
-      return d.stats && d.stats[0] && d.stats[0].splits ? d.stats[0].splits : [];
-    } catch(e) { return []; }
-  }));
-  // Flatten and deduplicate by team ID
   var seen = {};
   var allSplits = [];
-  results.forEach(function(splits) {
-    splits.forEach(function(s) {
-      var teamId = s.team && s.team.id ? s.team.id : Math.random();
-      if (!seen[teamId]) {
-        seen[teamId] = true;
-        allSplits.push(s);
-      }
-    });
-  });
+  for (var i = 0; i < SPORT_IDS.length; i++) {
+    try {
+      var r = await proxiedFetch(buildUrl(SPORT_IDS[i]));
+      if (!r.ok) continue;
+      var d = await r.json();
+      var splits = d.stats && d.stats[0] && d.stats[0].splits ? d.stats[0].splits : [];
+      splits.forEach(function(s) {
+        var teamId = s.team && s.team.id ? s.team.id : 'x'+i;
+        if (!seen[teamId]) {
+          seen[teamId] = true;
+          allSplits.push(s);
+        }
+      });
+    } catch(e) {}
+  }
   return allSplits;
 }
 
