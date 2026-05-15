@@ -608,6 +608,7 @@ async function findYesterdayGame(p, dateStr) {
   }
   return null;
 }
+  function updateGameLogDropdown() {
   var sel = document.getElementById('gamelogPlayerSel');
   var cur = sel.value;
   sel.innerHTML = '<option value="">— Select a player —</option>' +
