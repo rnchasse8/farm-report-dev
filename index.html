@@ -594,7 +594,20 @@ async function refreshStatuses() {
   savePlayers(); renderAll(); showToast('Statuses updated!');
 }
 
-function updateGameLogDropdown() {
+async function findYesterdayGame(p, dateStr) {
+  var group = p.type==='pitcher'?'pitching':'hitting';
+  for (var i = 0; i < SPORT_IDS.length; i++) {
+    try {
+      var r = await proxiedFetch(API+'/people/'+p.id+'/stats?stats=gameLog&season='+season+'&group='+group+'&sportId='+SPORT_IDS[i]);
+      if (!r.ok) continue;
+      var d = await r.json();
+      var splits = d.stats && d.stats[0] && d.stats[0].splits ? d.stats[0].splits : [];
+      var game = splits.find(function(s){return s.date===dateStr;});
+      if (game) return game;
+    } catch(e) {}
+  }
+  return null;
+}
   var sel = document.getElementById('gamelogPlayerSel');
   var cur = sel.value;
   sel.innerHTML = '<option value="">— Select a player —</option>' +
@@ -804,11 +817,7 @@ async function loadRecap() {
   var results=[];
   var seen={};
   await Promise.all(players.map(async function(p){
-    var group=p.type==='pitcher'?'pitching':'hitting';
-    var splits=await fetchWithSportIdFallback(function(sid){
-      return API+'/people/'+p.id+'/stats?stats=gameLog&season='+season+'&group='+group+'&sportId='+sid;
-    });
-    var game=splits.find(function(s){return s.date===dateStr;});
+    var game = await findYesterdayGame(p, dateStr);
     var uid=p.id+'-'+p.type;
     if (game&&!seen[uid]) { seen[uid]=true; results.push({p:p,stat:game.stat,opponent:(game.opponent&&game.opponent.name)||'—'}); }
   }));
