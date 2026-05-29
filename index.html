@@ -7,9 +7,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   :root {
-    --bg: #080c10; --bg2: #0d1520; --bg3: #111d2e;
-    --border: #1a2e44; --yellow: #64d2ff; --yellow2: #3ab8f0;
-    --text: #e8f4ff; --muted: #5a8aaa; --red: #e05252; --green: #52c97a;
+    --bg: #0f0a08; --bg2: #1a1008; --bg3: #241808;
+    --border: #3a2a1a; --yellow: #ff6b35; --yellow2: #e55a25;
+    --text: #fff4ee; --muted: #aa7a5a; --red: #e05252; --green: #52c97a;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
@@ -83,7 +83,7 @@
 <body>
 
 <header>
-  <div class="logo"><span>The Farm</span> Report</div>
+  <div class="logo"><span>The Farm</span> Report <span style="font-size:0.7rem;background:var(--yellow);color:#0f0a08;padding:2px 8px;border-radius:4px;margin-left:8px;vertical-align:middle;font-weight:800">DEV</span></div>
   <div class="header-right">
     <select class="season-sel" id="seasonSel" onchange="onSeasonChange()">
       <option value="2026">Season 2026</option>
@@ -309,7 +309,7 @@ async function fetchAllGameLogs(buildUrl) {
 var season = 2026;
 var currentTab = 'pitchers';
 var modalTab = 'overview';
-var players = JSON.parse(localStorage.getItem('farmPlayers') || '[]');
+var players = JSON.parse(localStorage.getItem('farmPlayersDev') || '[]');
 var statsCache = {};
 var sortState = { pitchers: { col: 'era', dir: 1 }, hitters: { col: 'avg', dir: 1 } };
 var currentModalPlayer = null;
@@ -620,7 +620,7 @@ function removePlayer(id, type) {
   savePlayers(); renderAll();
 }
 
-function savePlayers() { localStorage.setItem('farmPlayers', JSON.stringify(players)); }
+function savePlayers() { localStorage.setItem('farmPlayersDev', JSON.stringify(players)); }
 
 async function refreshStatuses() {
   showToast('Refreshing statuses...');
