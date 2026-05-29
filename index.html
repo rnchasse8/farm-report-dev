@@ -7,9 +7,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   :root {
-    --bg: #0f0a08; --bg2: #1a1008; --bg3: #241808;
-    --border: #3a2a1a; --yellow: #ff6b35; --yellow2: #e55a25;
-    --text: #fff4ee; --muted: #aa7a5a; --red: #e05252; --green: #52c97a;
+    --bg: #080c10; --bg2: #0d1520; --bg3: #111d2e;
+    --border: #1a2e44; --yellow: #64d2ff; --yellow2: #3ab8f0;
+    --text: #e8f4ff; --muted: #5a8aaa; --red: #e05252; --green: #52c97a;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
@@ -83,7 +83,7 @@
 <body>
 
 <header>
-  <div class="logo"><span>The Farm</span> Report <span style="font-size:0.7rem;background:var(--yellow);color:#0f0a08;padding:2px 8px;border-radius:4px;margin-left:8px;vertical-align:middle;font-weight:800">DEV</span></div>
+  <div class="logo"><span>The Farm</span> Report</div>
   <div class="header-right">
     <select class="season-sel" id="seasonSel" onchange="onSeasonChange()">
       <option value="2026">Season 2026</option>
@@ -139,6 +139,7 @@
         <th onclick="sortTable('pitchers','hr')">HR</th>
         <th onclick="sortTable('pitchers','strikePct')">STR%</th>
         <th onclick="sortTable('pitchers','pitchesPerGame')">P/G</th>
+        <th onclick="sortTable('pitchers','irsPct')">IRS%</th>
         <th></th>
       </tr></thead>
       <tbody id="pitcher-body"></tbody>
@@ -246,10 +247,7 @@ async function fetchAllLevels(buildUrl) {
       var splits = d.stats && d.stats[0] && d.stats[0].splits ? d.stats[0].splits : [];
       for (var j = 0; j < splits.length; j++) {
         var teamId = splits[j].team && splits[j].team.id ? splits[j].team.id : 'x'+i+j;
-        if (!seen[teamId]) {
-          seen[teamId] = true;
-          allSplits.push(splits[j]);
-        }
+        if (!seen[teamId]) { seen[teamId] = true; allSplits.push(splits[j]); }
       }
     } catch(e) {}
   }
@@ -279,27 +277,23 @@ async function fetchAllGameLogs(buildUrl) {
       var d = await r.json();
       var splits = d.stats && d.stats[0] && d.stats[0].splits ? d.stats[0].splits : [];
       splits.forEach(function(s) {
-        var gameKey = s.date + '-' + (s.opponent && s.opponent.id ? s.opponent.id : '') + '-' + (s.stat.inningsPitched || s.stat.atBats || '');
-        if (!seen[gameKey]) {
-          seen[gameKey] = true;
-          allSplits.push(s);
-        }
+        var gameKey = s.date+'-'+(s.opponent&&s.opponent.id?s.opponent.id:'')+'-'+(s.stat.inningsPitched||s.stat.atBats||'');
+        if (!seen[gameKey]) { seen[gameKey] = true; allSplits.push(s); }
       });
     } catch(e) {}
   }
-  allSplits.sort(function(a, b) {
-    return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
-  });
+  allSplits.sort(function(a,b) { return a.date<b.date?-1:a.date>b.date?1:0; });
   return allSplits;
 }
-  async function findYesterdayGame(p, dateStr) {
-    var group = p.type==='pitcher'?'pitching':'hitting';
+
+async function findYesterdayGame(p, dateStr) {
+  var group = p.type==='pitcher'?'pitching':'hitting';
   for (var i = 0; i < SPORT_IDS.length; i++) {
     try {
       var r = await proxiedFetch(API+'/people/'+p.id+'/stats?stats=gameLog&season='+season+'&group='+group+'&sportId='+SPORT_IDS[i]);
       if (!r.ok) continue;
       var d = await r.json();
-      var splits = d.stats && d.stats[0] && d.stats[0].splits ? d.stats[0].splits : [];
+      var splits = d.stats&&d.stats[0]&&d.stats[0].splits?d.stats[0].splits:[];
       var game = splits.find(function(s){return s.date===dateStr;});
       if (game) return game;
     } catch(e) {}
@@ -310,12 +304,13 @@ async function fetchAllGameLogs(buildUrl) {
 var season = 2026;
 var currentTab = 'pitchers';
 var modalTab = 'overview';
-var players = JSON.parse(localStorage.getItem('farmPlayersDev') || '[]');
+var players = JSON.parse(localStorage.getItem('farmPlayers') || '[]');
 var statsCache = {};
 var sortState = { pitchers: { col: 'era', dir: 1 }, hitters: { col: 'avg', dir: 1 } };
 var currentModalPlayer = null;
 var trendCharts = {};
 var searchTimeout;
+var recapDayOffset = 1;
 
 function showToast(msg) {
   var t = document.getElementById('toast');
@@ -339,46 +334,47 @@ async function refreshAll() {
 async function fetchStats(p) {
   var key = p.id+'-'+season+'-'+p.type;
   if (statsCache[key]) return statsCache[key];
-  var group = p.type === 'pitcher' ? 'pitching' : 'hitting';
+  var group = p.type==='pitcher'?'pitching':'hitting';
   var splits = await fetchAllLevels(function(id) {
     return API+'/people/'+p.id+'/stats?stats=season&season='+season+'&group='+group+'&sportId='+id;
   });
-  var agg = splits.length > 0 ? aggregateSplits(splits, p.type) : null;
-  statsCache[key] = { splits: splits, agg: agg };
+  var agg = splits.length>0?aggregateSplits(splits,p.type):null;
+  statsCache[key] = { splits:splits, agg:agg };
   return statsCache[key];
 }
 
 function aggregateSplits(splits, type) {
-  if (type === 'pitcher') {
-    var w=0,l=0,g=0,gs=0,ip=0,h=0,r=0,er=0,hr=0,bb=0,so=0,hbp=0,bf=0,totalPitches=0,totalStrikes=0,totalBases=0;
+  if (type==='pitcher') {
+    var w=0,l=0,g=0,gs=0,ip=0,h=0,r=0,er=0,hr=0,bb=0,so=0,hbp=0,bf=0,totalPitches=0,totalStrikes=0,totalBases=0,ir=0,irs=0;
     splits.forEach(function(s) {
-      var st = s.stat;
+      var st=s.stat;
       w+=st.wins||0; l+=st.losses||0; g+=st.gamesPitched||0; gs+=st.gamesStarted||0;
       ip+=Math.round(parseFloat(st.inningsPitched||0)*3);
       h+=st.hits||0; r+=st.runs||0; er+=st.earnedRuns||0; hr+=st.homeRuns||0;
       bb+=(st.baseOnBalls||0)+(st.intentionalWalks||0);
       so+=st.strikeOuts||0; hbp+=st.hitBatsmen||0; bf+=st.battersFaced||0;
-      totalPitches+=st.numberOfPitches||0; totalStrikes+=st.strikes||0;
-      totalBases+=st.totalBases||0;
+      totalPitches+=st.numberOfPitches||0; totalStrikes+=st.strikes||0; totalBases+=st.totalBases||0;
+      ir+=st.inheritedRunners||0; irs+=st.inheritedRunnersScored||0;
     });
-    var ipReal = Math.floor(ip/3)+(ip%3)/10;
-    var era = ip>0 ? (er*27/ip).toFixed(2) : '—';
-    var whip = ip>0 ? ((bb+h)/(ip/3)).toFixed(2) : '—';
-    var ab = bf-bb-hbp;
-    var baa = ab>0 ? (h/ab).toFixed(3) : '—';
-    var fip = ip>0 ? (((13*hr)+(3*(bb+hbp))-(2*so))/(ip/3)+3.10).toFixed(2) : '—';
-    var kPct = bf>0 ? (so/bf*100).toFixed(1)+'%' : '—';
-    var bbPct = bf>0 ? (bb/bf*100).toFixed(1)+'%' : '—';
-    var pitchesPerGame = g>0 ? (totalPitches/g).toFixed(1) : '—';
-    var strikePct = totalPitches>0 ? (totalStrikes/totalPitches*100).toFixed(1)+'%' : '—';
-    var slgAgainst = ab>0 ? (totalBases/ab).toFixed(3) : '—';
+    var ipReal=Math.floor(ip/3)+(ip%3)/10;
+    var era=ip>0?(er*27/ip).toFixed(2):'—';
+    var whip=ip>0?((bb+h)/(ip/3)).toFixed(2):'—';
+    var ab=bf-bb-hbp;
+    var baa=ab>0?(h/ab).toFixed(3):'—';
+    var fip=ip>0?(((13*hr)+(3*(bb+hbp))-(2*so))/(ip/3)+3.10).toFixed(2):'—';
+    var kPct=bf>0?(so/bf*100).toFixed(1)+'%':'—';
+    var bbPct=bf>0?(bb/bf*100).toFixed(1)+'%':'—';
+    var pitchesPerGame=g>0?(totalPitches/g).toFixed(1):'—';
+    var strikePct=totalPitches>0?(totalStrikes/totalPitches*100).toFixed(1)+'%':'—';
+    var slgAgainst=ab>0?(totalBases/ab).toFixed(3):'—';
+    var irsPct = ir>0 ? (irs/ir*100).toFixed(1)+'%' : '—';
     return {w:w,l:l,g:g,gs:gs,ip:ipReal,h:h,r:r,er:er,hr:hr,bb:bb,so:so,hbp:hbp,bf:bf,
             era:era,whip:whip,baa:baa,slgAgainst:slgAgainst,fip:fip,kPct:kPct,bbPct:bbPct,
-            totalPitches:totalPitches,pitchesPerGame:pitchesPerGame,strikePct:strikePct};
+            totalPitches:totalPitches,pitchesPerGame:pitchesPerGame,strikePct:strikePct,irsPct:irsPct,ir:ir,irs:irs};
   } else {
     var g=0,ab=0,h=0,doubles=0,triples=0,hr=0,rbi=0,r=0,bb=0,so=0,sb=0,cs=0,hbp=0,sf=0;
     splits.forEach(function(s) {
-      var st = s.stat;
+      var st=s.stat;
       g+=st.gamesPlayed||0; ab+=st.atBats||0; h+=st.hits||0;
       doubles+=st.doubles||0; triples+=st.triples||0; hr+=st.homeRuns||0;
       rbi+=st.rbi||0; r+=st.runs||0;
@@ -386,14 +382,14 @@ function aggregateSplits(splits, type) {
       so+=st.strikeOuts||0; sb+=st.stolenBases||0; cs+=st.caughtStealing||0;
       hbp+=st.hitByPitch||0; sf+=st.sacFlies||0;
     });
-    var avg = ab>0 ? (h/ab).toFixed(3) : '—';
-    var pa = ab+bb+hbp+sf;
-    var obp = pa>0 ? ((h+bb+hbp)/pa).toFixed(3) : '—';
-    var tb = h+doubles+2*triples+3*hr;
-    var slg = ab>0 ? (tb/ab).toFixed(3) : '—';
-    var ops = pa>0&&ab>0 ? ((h+bb+hbp)/pa+tb/ab).toFixed(3) : '—';
-    var kPct = pa>0 ? (so/pa*100).toFixed(1)+'%' : '—';
-    var bbPct = pa>0 ? (bb/pa*100).toFixed(1)+'%' : '—';
+    var avg=ab>0?(h/ab).toFixed(3):'—';
+    var pa=ab+bb+hbp+sf;
+    var obp=pa>0?((h+bb+hbp)/pa).toFixed(3):'—';
+    var tb=h+doubles+2*triples+3*hr;
+    var slg=ab>0?(tb/ab).toFixed(3):'—';
+    var ops=pa>0&&ab>0?((h+bb+hbp)/pa+tb/ab).toFixed(3):'—';
+    var kPct=pa>0?(so/pa*100).toFixed(1)+'%':'—';
+    var bbPct=pa>0?(bb/pa*100).toFixed(1)+'%':'—';
     return {g:g,ab:ab,h:h,doubles:doubles,triples:triples,hr:hr,rbi:rbi,r:r,bb:bb,so:so,
             sb:sb,cs:cs,hbp:hbp,sf:sf,avg:avg,obp:obp,slg:slg,ops:ops,kPct:kPct,bbPct:bbPct};
   }
@@ -405,109 +401,101 @@ function fmt(v) {
 }
 
 function extractStatus(person) {
-  var entries = person.rosterEntries || [];
-  for (var i=0; i<entries.length; i++) {
-    if (entries[i].isActive) return entries[i].status && entries[i].status.description ? entries[i].status.description : 'Active';
+  var entries=person.rosterEntries||[];
+  for (var i=0;i<entries.length;i++) {
+    if (entries[i].isActive) return entries[i].status&&entries[i].status.description?entries[i].status.description:'Active';
   }
   return 'Active';
 }
 
 function statusBadge(status) {
-  if (!status || status === 'Active') return '';
-  var color = (status.indexOf('IL') >= 0 || status.indexOf('Injured') >= 0) ? 'var(--red)' :
-              status.indexOf('Day-to-Day') >= 0 ? '#f5a623' : 'var(--muted)';
+  if (!status||status==='Active') return '';
+  var color=(status.indexOf('IL')>=0||status.indexOf('Injured')>=0)?'var(--red)':status.indexOf('Day-to-Day')>=0?'#f5a623':'var(--muted)';
   return '<span style="display:inline-block;font-size:0.68rem;font-weight:700;padding:1px 5px;border-radius:3px;border:1px solid '+color+';color:'+color+';margin-left:5px;vertical-align:middle">'+status+'</span>';
 }
 
-function getNotes(id) { return localStorage.getItem('note-'+id) || ''; }
+function getNotes(id) { return localStorage.getItem('note-'+id)||''; }
 
 function saveNote(id, text) {
-  if (text.trim()) localStorage.setItem('note-'+id, text.trim());
+  if (text.trim()) localStorage.setItem('note-'+id,text.trim());
   else localStorage.removeItem('note-'+id);
   renderAll();
 }
 
 function notesHTML(id) {
-  var note = getNotes(id);
-  var clearBtn = note ? '<button onclick="saveNote('+id+', \'\'); document.getElementById(\'note-'+id+'\').value=\'\'" style="margin-top:8px;margin-left:8px;background:transparent;color:var(--red);border:1px solid var(--red);padding:8px 16px;border-radius:4px;font-weight:700;cursor:pointer;font-size:0.85rem">Clear</button>' : '';
+  var note=getNotes(id);
+  var clearBtn=note?'<button onclick="saveNote('+id+', \'\'); document.getElementById(\'note-'+id+'\').value=\'\'" style="margin-top:8px;margin-left:8px;background:transparent;color:var(--red);border:1px solid var(--red);padding:8px 16px;border-radius:4px;font-weight:700;cursor:pointer;font-size:0.85rem">Clear</button>':'';
   return '<div style="margin-top:8px"><div class="chart-title" style="margin-bottom:8px">Scouting Notes</div><textarea id="note-'+id+'" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:10px;font-size:0.9rem;font-family:Segoe UI,sans-serif;resize:vertical;min-height:80px;outline:none" placeholder="Add scouting notes, injury status, things to watch...">'+note+'</textarea><button onclick="saveNote('+id+', document.getElementById(\'note-'+id+'\').value)" style="margin-top:8px;background:var(--yellow);color:#050d16;border:none;padding:8px 16px;border-radius:4px;font-weight:700;cursor:pointer;font-size:0.85rem">Save Note</button>'+clearBtn+'</div>';
 }
 
 function pitcherTrend(splits) {
-  if (!splits || splits.length < 3) return { era: null, whip: null };
-  var last5 = splits.slice(-5);
+  if (!splits||splits.length<3) return {era:null,whip:null};
+  var last5=splits.slice(-5);
   var ip=0,er=0,h=0,bb=0;
   last5.forEach(function(s) {
     var st=s.stat;
     ip+=Math.round(parseFloat(st.inningsPitched||0)*3);
-    er+=st.earnedRuns||0; h+=st.hits||0;
-    bb+=(st.baseOnBalls||0)+(st.intentionalWalks||0);
+    er+=st.earnedRuns||0; h+=st.hits||0; bb+=(st.baseOnBalls||0)+(st.intentionalWalks||0);
   });
-  return { era: ip>0?(er*27/ip).toFixed(2):null, whip: ip>0?((bb+h)/(ip/3)).toFixed(2):null };
+  return {era:ip>0?(er*27/ip).toFixed(2):null,whip:ip>0?((bb+h)/(ip/3)).toFixed(2):null};
 }
 
 function hitterTrend(splits) {
-  if (!splits || splits.length < 3) return { avg: null };
-  var last5 = splits.slice(-5);
+  if (!splits||splits.length<3) return {avg:null};
+  var last5=splits.slice(-5);
   var ab=0,h=0;
-  last5.forEach(function(s) { ab+=s.stat.atBats||0; h+=s.stat.hits||0; });
-  return { avg: ab>0?(h/ab).toFixed(3):null };
+  last5.forEach(function(s){ab+=s.stat.atBats||0;h+=s.stat.hits||0;});
+  return {avg:ab>0?(h/ab).toFixed(3):null};
 }
 
-function trendIndicator(current, last5, lowerIsBetter) {
+function trendIndicator(current,last5,lowerIsBetter) {
   if (!current||!last5||current==='—'||last5==='—') return '';
-  var diff = parseFloat(last5)-parseFloat(current);
-  if (Math.abs(diff) < 0.02) return '<span style="color:var(--muted);font-size:0.75rem;margin-left:4px">→</span>';
-  var better = lowerIsBetter ? diff < 0 : diff > 0;
-  return better ? '<span style="color:var(--green);font-size:0.75rem;margin-left:4px">▲</span>' : '<span style="color:var(--red);font-size:0.75rem;margin-left:4px">▼</span>';
+  var diff=parseFloat(last5)-parseFloat(current);
+  if (Math.abs(diff)<0.02) return '<span style="color:var(--muted);font-size:0.75rem;margin-left:4px">→</span>';
+  var better=lowerIsBetter?diff<0:diff>0;
+  return better?'<span style="color:var(--green);font-size:0.75rem;margin-left:4px">▲</span>':'<span style="color:var(--red);font-size:0.75rem;margin-left:4px">▼</span>';
 }
 
-function renderAll() {
-  renderPitchers(); renderHitters(); updateGameLogDropdown(); updateCounts();
-}
+function renderAll() { renderPitchers(); renderHitters(); updateGameLogDropdown(); updateCounts(); }
 
 function renderPitchers() {
-  var pitchers = players.filter(function(p) { return p.type==='pitcher'; });
-  document.getElementById('pitcher-empty').style.display = pitchers.length===0?'block':'none';
-  document.getElementById('pitcher-table').style.display = pitchers.length===0?'none':'table';
-  var sorted = sortPlayers(pitchers, sortState.pitchers.col, sortState.pitchers.dir);
-  document.getElementById('pitcher-body').innerHTML = sorted.map(function(p) {
-    var key = p.id+'-'+season+'-pitcher';
-    var s = statsCache[key] && statsCache[key].agg;
-    var splits = (statsCache[key] && statsCache[key].splits) || [];
-    var note = getNotes(p.id);
-    var noteHTML = note ? '<span style="display:block;font-size:0.72rem;color:#f5a623;margin-top:2px;font-style:italic">Note: '+(note.length>40?note.substring(0,40)+'…':note)+'</span>' : '';
+  var pitchers=players.filter(function(p){return p.type==='pitcher';});
+  document.getElementById('pitcher-empty').style.display=pitchers.length===0?'block':'none';
+  document.getElementById('pitcher-table').style.display=pitchers.length===0?'none':'table';
+  var sorted=sortPlayers(pitchers,sortState.pitchers.col,sortState.pitchers.dir);
+  document.getElementById('pitcher-body').innerHTML=sorted.map(function(p) {
+    var key=p.id+'-'+season+'-pitcher';
+    var s=statsCache[key]&&statsCache[key].agg;
+    var splits=(statsCache[key]&&statsCache[key].splits)||[];
+    var note=getNotes(p.id);
+    var noteHTML=note?'<span style="display:block;font-size:0.72rem;color:#f5a623;margin-top:2px;font-style:italic">Note: '+(note.length>40?note.substring(0,40)+'…':note)+'</span>':'';
     if (!s) return '<tr><td><span class="player-name" onclick="openModal('+p.id+')">'+p.name+'</span><span class="team-tag">'+(p.team||'—')+' · P</span></td><td colspan="19" style="color:var(--muted);font-style:italic;font-size:0.82rem">Not appeared this season.</td></tr>';
-    var trend = pitcherTrend(splits);
+    var trend=pitcherTrend(splits);
     return '<tr><td><span class="player-name" onclick="openModal('+p.id+')">'+p.name+'</span>'+statusBadge(p.status)+'<span class="team-tag">'+(p.team||'—')+' · P</span>'+noteHTML+'</td>'+
       '<td>'+fmt(s.w)+'</td><td>'+fmt(s.l)+'</td><td>'+fmt(s.g)+'</td><td>'+fmt(s.gs)+'</td>'+
       '<td>'+fmt(s.era)+trendIndicator(s.era,trend.era,true)+'</td>'+
-      '<td>'+fmt(s.fip)+'</td>'+
-      '<td>'+fmt(s.ip)+'</td>'+
-      '<td>'+fmt(s.h)+'</td>'+
-      '<td>'+fmt(s.so)+'</td>'+
-      '<td>'+fmt(s.bb)+'</td>'+
+      '<td>'+fmt(s.fip)+'</td><td>'+fmt(s.ip)+'</td><td>'+fmt(s.h)+'</td><td>'+fmt(s.so)+'</td><td>'+fmt(s.bb)+'</td>'+
       '<td>'+fmt(s.kPct)+'</td><td>'+fmt(s.bbPct)+'</td>'+
       '<td>'+fmt(s.whip)+trendIndicator(s.whip,trend.whip,true)+'</td>'+
       '<td>'+fmt(s.baa)+'</td><td>'+fmt(s.slgAgainst)+'</td><td>'+fmt(s.hr)+'</td>'+
-      '<td>'+fmt(s.strikePct)+'</td><td>'+fmt(s.pitchesPerGame)+'</td>'+
+      '<td>'+fmt(s.strikePct)+'</td><td>'+fmt(s.pitchesPerGame)+'</td><td>'+fmt(s.irsPct)+'</td>'+
       '<td><button class="remove-btn" onclick="removePlayer('+p.id+',\'pitcher\')">✕</button></td></tr>';
   }).join('');
 }
 
 function renderHitters() {
-  var hitters = players.filter(function(p) { return p.type==='hitter'; });
-  document.getElementById('hitter-empty').style.display = hitters.length===0?'block':'none';
-  document.getElementById('hitter-table').style.display = hitters.length===0?'none':'table';
-  var sorted = sortPlayers(hitters, sortState.hitters.col, sortState.hitters.dir);
-  document.getElementById('hitter-body').innerHTML = sorted.map(function(p) {
-    var key = p.id+'-'+season+'-hitter';
-    var s = statsCache[key] && statsCache[key].agg;
-    var splits = (statsCache[key] && statsCache[key].splits) || [];
-    var note = getNotes(p.id);
-    var noteHTML = note ? '<span style="display:block;font-size:0.72rem;color:#f5a623;margin-top:2px;font-style:italic">Note: '+(note.length>40?note.substring(0,40)+'…':note)+'</span>' : '';
+  var hitters=players.filter(function(p){return p.type==='hitter';});
+  document.getElementById('hitter-empty').style.display=hitters.length===0?'block':'none';
+  document.getElementById('hitter-table').style.display=hitters.length===0?'none':'table';
+  var sorted=sortPlayers(hitters,sortState.hitters.col,sortState.hitters.dir);
+  document.getElementById('hitter-body').innerHTML=sorted.map(function(p) {
+    var key=p.id+'-'+season+'-hitter';
+    var s=statsCache[key]&&statsCache[key].agg;
+    var splits=(statsCache[key]&&statsCache[key].splits)||[];
+    var note=getNotes(p.id);
+    var noteHTML=note?'<span style="display:block;font-size:0.72rem;color:#f5a623;margin-top:2px;font-style:italic">Note: '+(note.length>40?note.substring(0,40)+'…':note)+'</span>':'';
     if (!s) return '<tr><td><span class="player-name" onclick="openModal('+p.id+')">'+p.name+'</span><span class="team-tag">'+(p.team||'—')+' · '+(p.pos||'OF')+'</span></td><td colspan="14" style="color:var(--muted);font-style:italic;font-size:0.82rem">Not appeared this season.</td></tr>';
-    var trend = hitterTrend(splits);
+    var trend=hitterTrend(splits);
     return '<tr><td><span class="player-name" onclick="openModal('+p.id+')">'+p.name+'</span>'+statusBadge(p.status)+'<span class="team-tag">'+(p.team||'—')+' · '+(p.pos||'OF')+'</span>'+noteHTML+'</td>'+
       '<td>'+fmt(s.g)+'</td><td>'+fmt(s.ab)+'</td>'+
       '<td>'+fmt(s.avg)+trendIndicator(s.avg,trend.avg,false)+'</td>'+
@@ -519,120 +507,120 @@ function renderHitters() {
   }).join('');
 }
 
-function sortPlayers(list, col, dir) {
+function sortPlayers(list,col,dir) {
   return list.slice().sort(function(a,b) {
     if (col==='name') return dir*a.name.localeCompare(b.name);
-    var sa = statsCache[a.id+'-'+season+'-'+a.type] && statsCache[a.id+'-'+season+'-'+a.type].agg;
-    var sb = statsCache[b.id+'-'+season+'-'+b.type] && statsCache[b.id+'-'+season+'-'+b.type].agg;
+    var sa=statsCache[a.id+'-'+season+'-'+a.type]&&statsCache[a.id+'-'+season+'-'+a.type].agg;
+    var sb=statsCache[b.id+'-'+season+'-'+b.type]&&statsCache[b.id+'-'+season+'-'+b.type].agg;
     if (!sa||!sb) return 0;
     return dir*((parseFloat(sa[col])||0)-(parseFloat(sb[col])||0));
   });
 }
 
-function sortTable(type, col) {
-  var s = sortState[type];
-  if (s.col===col) s.dir*=-1; else { s.col=col; s.dir=1; }
+function sortTable(type,col) {
+  var s=sortState[type];
+  if (s.col===col) s.dir*=-1; else {s.col=col;s.dir=1;}
   if (type==='pitchers') renderPitchers(); else renderHitters();
 }
 
 function updateCounts() {
-  document.getElementById('pitcher-cnt').textContent = players.filter(function(p){return p.type==='pitcher';}).length;
-  document.getElementById('hitter-cnt').textContent = players.filter(function(p){return p.type==='hitter';}).length;
+  document.getElementById('pitcher-cnt').textContent=players.filter(function(p){return p.type==='pitcher';}).length;
+  document.getElementById('hitter-cnt').textContent=players.filter(function(p){return p.type==='hitter';}).length;
 }
 
 function switchTab(tab) {
-  currentTab = tab;
+  currentTab=tab;
   ['pitchers','hitters','gamelog','recap','workload'].forEach(function(t) {
-    document.getElementById('tab-'+t).className = 'tab'+(t===tab?' active':'');
-    document.getElementById('view-'+t).style.display = t===tab?'block':'none';
+    document.getElementById('tab-'+t).className='tab'+(t===tab?' active':'');
+    document.getElementById('view-'+t).style.display=t===tab?'block':'none';
   });
   if (tab==='gamelog') updateGameLogDropdown();
-  if (tab==='recap') { setRecapDay(1); }
+  if (tab==='recap') setRecapDay(1);
   if (tab==='workload') loadWorkload();
 }
 
 async function doSearch(inline) {
-  var q = document.getElementById('searchInput').value.trim();
-  if (!q || q.length < 2) { if(inline) document.getElementById('searchResults').style.display='none'; return; }
+  var q=document.getElementById('searchInput').value.trim();
+  if (!q||q.length<2) {if(inline) document.getElementById('searchResults').style.display='none'; return;}
   clearTimeout(searchTimeout);
   if (inline) {
-    searchTimeout = setTimeout(async function() {
+    searchTimeout=setTimeout(async function() {
       try {
-        var r = await proxiedFetch(API+'/people/search?names='+encodeURIComponent(q)+'&sportIds=1,11,12,13,14,15,16&active=true');
-        var d = await r.json();
+        var r=await proxiedFetch(API+'/people/search?names='+encodeURIComponent(q)+'&sportIds=1,11,12,13,14,15,16&active=true');
+        var d=await r.json();
         showInlineResults(d.people||[]);
       } catch(e) {}
-    }, 400);
+    },400);
   } else {
     try {
-      var r = await proxiedFetch(API+'/people/search?names='+encodeURIComponent(q)+'&sportIds=1,11,12,13,14,15,16&active=true');
-      var d = await r.json();
+      var r=await proxiedFetch(API+'/people/search?names='+encodeURIComponent(q)+'&sportIds=1,11,12,13,14,15,16&active=true');
+      var d=await r.json();
       showInlineResults(d.people||[]);
-    } catch(e) { showToast('Search failed. Try again.'); }
+    } catch(e) {showToast('Search failed. Try again.');}
   }
 }
 
 function showInlineResults(results) {
-  var box = document.getElementById('searchResults');
+  var box=document.getElementById('searchResults');
   if (!results.length) {
-    box.innerHTML = '<div class="search-result-item"><span style="color:var(--muted)">No results found</span></div>';
+    box.innerHTML='<div class="search-result-item"><span style="color:var(--muted)">No results found</span></div>';
     box.style.display='block'; return;
   }
-  box.innerHTML = results.slice(0,8).map(function(p) {
-    var pos = (p.primaryPosition&&p.primaryPosition.abbreviation)||'?';
-    var team = (p.currentTeam&&p.currentTeam.name)||'Free Agent';
+  box.innerHTML=results.slice(0,8).map(function(p) {
+    var pos=(p.primaryPosition&&p.primaryPosition.abbreviation)||'?';
+    var team=(p.currentTeam&&p.currentTeam.name)||'Free Agent';
     return '<div class="search-result-item" onclick="addPlayerFromSearch('+p.id+')"><span>'+p.fullName+'</span><span class="pos">'+pos+' · '+team+'</span></div>';
   }).join('');
   box.style.display='block';
 }
 
-document.addEventListener('click', function(e) {
+document.addEventListener('click',function(e) {
   if (!e.target.closest('.search-wrap')) document.getElementById('searchResults').style.display='none';
 });
 
 async function addPlayerFromSearch(id) {
   document.getElementById('searchResults').style.display='none';
   document.getElementById('searchInput').value='';
-  var existingPitcher = players.find(function(p){return p.id===id&&p.type==='pitcher';});
-  var existingHitter = players.find(function(p){return p.id===id&&p.type==='hitter';});
-  if (existingPitcher && existingHitter) { showToast('Player already on both rosters'); return; }
+  var existingPitcher=players.find(function(p){return p.id===id&&p.type==='pitcher';});
+  var existingHitter=players.find(function(p){return p.id===id&&p.type==='hitter';});
+  if (existingPitcher&&existingHitter) {showToast('Player already on both rosters'); return;}
   try {
-    var r = await proxiedFetch(API+'/people/'+id+'?hydrate=currentTeam,rosterEntries');
-    var d = await r.json();
-    var p = d.people&&d.people[0];
+    var r=await proxiedFetch(API+'/people/'+id+'?hydrate=currentTeam,rosterEntries');
+    var d=await r.json();
+    var p=d.people&&d.people[0];
     if (!p) return;
-    var pos = (p.primaryPosition&&p.primaryPosition.abbreviation)||'OF';
-    var isPitcher = pos==='P'||pos==='SP'||pos==='RP';
-    if (existingPitcher && !existingHitter) isPitcher = false;
-    if (existingHitter && !existingPitcher) isPitcher = true;
-    var status = extractStatus(p);
-    var player = {id:p.id, name:p.fullName, team:(p.currentTeam&&p.currentTeam.name)||'—', pos:pos, type:isPitcher?'pitcher':'hitter', status:status};
+    var pos=(p.primaryPosition&&p.primaryPosition.abbreviation)||'OF';
+    var isPitcher=pos==='P'||pos==='SP'||pos==='RP';
+    if (existingPitcher&&!existingHitter) isPitcher=false;
+    if (existingHitter&&!existingPitcher) isPitcher=true;
+    var status=extractStatus(p);
+    var player={id:p.id,name:p.fullName,team:(p.currentTeam&&p.currentTeam.name)||'—',pos:pos,type:isPitcher?'pitcher':'hitter',status:status};
     players.push(player);
     savePlayers();
     await fetchStats(player);
     renderAll();
     showToast(p.fullName+' added!');
     switchTab(isPitcher?'pitchers':'hitters');
-  } catch(e) { showToast('Failed to add player.'); }
+  } catch(e) {showToast('Failed to add player.');}
 }
 
-function removePlayer(id, type) {
-  players = players.filter(function(p){return !(p.id===id&&p.type===type);});
+function removePlayer(id,type) {
+  players=players.filter(function(p){return !(p.id===id&&p.type===type);});
   savePlayers(); renderAll();
 }
 
-function savePlayers() { localStorage.setItem('farmPlayersDev', JSON.stringify(players)); }
+function savePlayers() { localStorage.setItem('farmPlayers',JSON.stringify(players)); }
 
 async function refreshStatuses() {
   showToast('Refreshing statuses...');
   await Promise.all(players.map(async function(p) {
     try {
-      var r = await proxiedFetch(API+'/people/'+p.id+'?hydrate=currentTeam,rosterEntries');
-      var d = await r.json();
-      var person = d.people&&d.people[0];
+      var r=await proxiedFetch(API+'/people/'+p.id+'?hydrate=currentTeam,rosterEntries');
+      var d=await r.json();
+      var person=d.people&&d.people[0];
       if (person) {
-        p.status = extractStatus(person);
-        p.team = (person.currentTeam&&person.currentTeam.name)||p.team;
+        p.status=extractStatus(person);
+        p.team=(person.currentTeam&&person.currentTeam.name)||p.team;
       }
     } catch(e) {}
   }));
@@ -640,37 +628,37 @@ async function refreshStatuses() {
 }
 
 function updateGameLogDropdown() {
-  var sel = document.getElementById('gamelogPlayerSel');
-  var cur = sel.value;
-  sel.innerHTML = '<option value="">— Select a player —</option>' +
+  var sel=document.getElementById('gamelogPlayerSel');
+  var cur=sel.value;
+  sel.innerHTML='<option value="">— Select a player —</option>'+
     players.map(function(p){return '<option value="'+p.id+'-'+p.type+'">'+p.name+' ('+(p.type==='pitcher'?'P':p.pos||'H')+')</option>';}).join('');
-  if (cur && players.find(function(p){return p.id+'-'+p.type===cur;})) sel.value=cur;
+  if (cur&&players.find(function(p){return p.id+'-'+p.type===cur;})) sel.value=cur;
 }
 
 async function loadGameLog() {
-  var val = document.getElementById('gamelogPlayerSel').value;
-  var limit = parseInt(document.getElementById('gamelogLimitSel').value);
-  var box = document.getElementById('gamelog-content');
-  if (!val) { box.innerHTML='<div class="empty-state"><h2>Select a player to view their game log</h2></div>'; return; }
-  var parts = val.split('-');
-  var type = parts[parts.length-1];
-  var id = parseInt(parts[0]);
+  var val=document.getElementById('gamelogPlayerSel').value;
+  var limit=parseInt(document.getElementById('gamelogLimitSel').value);
+  var box=document.getElementById('gamelog-content');
+  if (!val) {box.innerHTML='<div class="empty-state"><h2>Select a player to view their game log</h2></div>'; return;}
+  var parts=val.split('-');
+  var type=parts[parts.length-1];
+  var id=parseInt(parts[0]);
   box.innerHTML='<div class="loading"><span class="spinner"></span>Loading game log...</div>';
-  var p = players.find(function(pl){return pl.id===id&&pl.type===type;});
-  var group = p.type==='pitcher'?'pitching':'hitting';
-  var splits = await fetchAllGameLogs(function(sid){
+  var p=players.find(function(pl){return pl.id===id&&pl.type===type;});
+  var group=p.type==='pitcher'?'pitching':'hitting';
+  var splits=await fetchAllGameLogs(function(sid){
     return API+'/people/'+id+'/stats?stats=gameLog&season='+season+'&group='+group+'&sportId='+sid;
   });
-  if (!splits.length) { box.innerHTML='<div class="empty-state"><h2>No game log data found</h2></div>'; return; }
-  renderGameLog(splits.slice(-limit).reverse(), p, box);
+  if (!splits.length) {box.innerHTML='<div class="empty-state"><h2>No game log data found</h2></div>'; return;}
+  renderGameLog(splits.slice(-limit).reverse(),p,box);
 }
 
-function renderGameLog(splits, p, box) {
-  var isPitcher = p.type==='pitcher';
-  var thS = 'padding:8px;text-align:right;color:var(--muted);border-bottom:1px solid var(--border);background:var(--bg3)';
-  var tdS = 'padding:8px;border-bottom:1px solid var(--border);text-align:right';
+function renderGameLog(splits,p,box) {
+  var isPitcher=p.type==='pitcher';
+  var thS='padding:8px;text-align:right;color:var(--muted);border-bottom:1px solid var(--border);background:var(--bg3)';
+  var tdS='padding:8px;border-bottom:1px solid var(--border);text-align:right';
   if (isPitcher) {
-    box.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:0.82rem"><thead><tr>'+
+    box.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:0.82rem"><thead><tr>'+
       '<th style="'+thS+';text-align:left">Date</th><th style="'+thS+'">Opp</th><th style="'+thS+'">Dec</th>'+
       '<th style="'+thS+'">IP</th><th style="'+thS+'">H</th><th style="'+thS+'">R</th>'+
       '<th style="'+thS+'">ER</th><th style="'+thS+'">BB</th><th style="'+thS+'">SO</th>'+
@@ -692,7 +680,7 @@ function renderGameLog(splits, p, box) {
           '<td style="'+tdS+';font-weight:700;color:'+pc+'">'+(pitches||'—')+'</td></tr>';
       }).join('')+'</tbody></table>';
   } else {
-    box.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:0.82rem"><thead><tr>'+
+    box.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:0.82rem"><thead><tr>'+
       '<th style="'+thS+';text-align:left">Date</th><th style="'+thS+'">Opp</th>'+
       '<th style="'+thS+'">AB</th><th style="'+thS+'">H</th><th style="'+thS+'">2B</th>'+
       '<th style="'+thS+'">3B</th><th style="'+thS+'">HR</th><th style="'+thS+'">RBI</th>'+
@@ -714,12 +702,12 @@ function renderGameLog(splits, p, box) {
 }
 
 async function openModal(id) {
-  var p = players.find(function(pl){return pl.id===id;});
+  var p=players.find(function(pl){return pl.id===id;});
   if (!p) return;
-  currentModalPlayer = p;
-  document.getElementById('modalName').textContent = p.name;
-  document.getElementById('modalSub').textContent = p.team+' · '+(p.pos||p.type);
-  document.getElementById('playerModal').className = 'modal-overlay open';
+  currentModalPlayer=p;
+  document.getElementById('modalName').textContent=p.name;
+  document.getElementById('modalSub').textContent=p.team+' · '+(p.pos||p.type);
+  document.getElementById('playerModal').className='modal-overlay open';
   modalTab='overview';
   document.getElementById('mtab-overview').className='modal-tab active';
   document.getElementById('mtab-charts').className='modal-tab';
@@ -732,12 +720,12 @@ function closeModal() {
 }
 
 async function renderModalOverview(p) {
-  var box = document.getElementById('modalBody');
+  var box=document.getElementById('modalBody');
   box.innerHTML='<div class="loading"><span class="spinner"></span>Loading...</div>';
-  var key = p.id+'-'+season+'-'+p.type;
+  var key=p.id+'-'+season+'-'+p.type;
   if (!statsCache[key]) await fetchStats(p);
-  var s = statsCache[key]&&statsCache[key].agg;
-  if (!s) { box.innerHTML='<div class="empty-state"><h2>No stats available</h2></div>'; return; }
+  var s=statsCache[key]&&statsCache[key].agg;
+  if (!s) {box.innerHTML='<div class="empty-state"><h2>No stats available</h2></div>'; return;}
   if (p.type==='pitcher') {
     box.innerHTML='<div class="stat-grid">'+
       '<div class="stat-card"><div class="val">'+s.era+'</div><div class="lbl">ERA</div></div>'+
@@ -753,6 +741,7 @@ async function renderModalOverview(p) {
       '<div class="stat-card"><div class="val">'+s.totalPitches+'</div><div class="lbl">Pitches</div></div>'+
       '<div class="stat-card"><div class="val">'+s.strikePct+'</div><div class="lbl">STR%</div></div>'+
       '<div class="stat-card"><div class="val">'+s.pitchesPerGame+'</div><div class="lbl">P/G</div></div>'+
+      '<div class="stat-card"><div class="val">'+s.irsPct+'</div><div class="lbl">IRS%</div></div>'+
       '</div>'+notesHTML(p.id);
   } else {
     box.innerHTML='<div class="stat-grid">'+
@@ -771,14 +760,14 @@ async function renderModalOverview(p) {
 }
 
 async function renderModalCharts(p) {
-  var box = document.getElementById('modalBody');
+  var box=document.getElementById('modalBody');
   box.innerHTML='<div class="loading"><span class="spinner"></span>Loading chart data...</div>';
   try {
-    var group = p.type==='pitcher'?'pitching':'hitting';
-    var splits = await fetchWithSportIdFallback(function(sid){
+    var group=p.type==='pitcher'?'pitching':'hitting';
+    var splits=await fetchWithSportIdFallback(function(sid){
       return API+'/people/'+p.id+'/stats?stats=gameLog&season='+season+'&group='+group+'&sportId='+sid;
     });
-    if (!splits.length) { box.innerHTML='<div class="empty-state"><h2>Not enough data for charts</h2></div>'; return; }
+    if (!splits.length) {box.innerHTML='<div class="empty-state"><h2>Not enough data for charts</h2></div>'; return;}
     if (p.type==='pitcher') {
       var cumIP=0,cumER=0,cumH=0,cumBB=0,cumHBP=0,cumHR=0,cumSO=0;
       var labels=[],eras=[],whips=[],fips=[];
@@ -819,7 +808,7 @@ async function renderModalCharts(p) {
         trendCharts['avg']=new Chart(document.getElementById('chart-avg'),{type:'line',data:{labels:labels,datasets:[{label:'AVG',data:avgs,borderColor:'#64d2ff',tension:0.3,pointRadius:3,fill:false},{label:'OBP',data:obps,borderColor:'#52c97a',tension:0.3,pointRadius:3,fill:false},{label:'SLG',data:slgs,borderColor:'#e05252',tension:0.3,pointRadius:3,fill:false}]},options:chartOpts()});
       },50);
     }
-  } catch(e) { box.innerHTML='<div class="empty-state"><h2>Failed to load chart data</h2></div>'; }
+  } catch(e) {box.innerHTML='<div class="empty-state"><h2>Failed to load chart data</h2></div>';}
 }
 
 function chartOpts() {
@@ -838,34 +827,31 @@ function switchModalTab(tab) {
   else renderModalCharts(currentModalPlayer);
 }
 
-var recapDayOffset = 1;
-
 function setRecapDay(offset) {
-  recapDayOffset = offset;
-  for (var i=0; i<=5; i++) {
-    var btn = document.getElementById('recap-btn-'+i);
-    if (btn) btn.style.borderColor = i===offset ? 'var(--yellow)' : '';
-    if (btn) btn.style.color = i===offset ? 'var(--yellow)' : '';
+  recapDayOffset=offset;
+  for (var i=0;i<=5;i++) {
+    var btn=document.getElementById('recap-btn-'+i);
+    if (btn) { btn.style.borderColor=i===offset?'var(--yellow)':''; btn.style.color=i===offset?'var(--yellow)':''; }
   }
   loadRecap();
 }
 
 async function loadRecap() {
-  if (!players.length) { document.getElementById('recap-content').innerHTML='<div class="empty-state"><h2>No players on your roster yet</h2></div>'; return; }
-  var box = document.getElementById('recap-content');
+  if (!players.length) {document.getElementById('recap-content').innerHTML='<div class="empty-state"><h2>No players on your roster yet</h2></div>'; return;}
+  var box=document.getElementById('recap-content');
   box.innerHTML='<div class="loading"><span class="spinner"></span>Loading stats...</div>';
-  var targetDate = new Date();
+  var targetDate=new Date();
   targetDate.setDate(targetDate.getDate()-recapDayOffset);
-  var dateStr = targetDate.toISOString().split('T')[0];
+  var dateStr=targetDate.toISOString().split('T')[0];
   document.getElementById('recap-date-label').textContent='Recap for '+targetDate.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
   var results=[];
   var seen={};
   await Promise.all(players.map(async function(p){
-    var game = await findYesterdayGame(p, dateStr);
+    var game=await findYesterdayGame(p,dateStr);
     var uid=p.id+'-'+p.type;
-    if (game&&!seen[uid]) { seen[uid]=true; results.push({p:p,stat:game.stat,opponent:(game.opponent&&game.opponent.name)||'—'}); }
+    if (game&&!seen[uid]) {seen[uid]=true; results.push({p:p,stat:game.stat,opponent:(game.opponent&&game.opponent.name)||'—'});}
   }));
-  if (!results.length) { box.innerHTML='<div class="empty-state"><h2>No games found for yesterday</h2></div>'; return; }
+  if (!results.length) {box.innerHTML='<div class="empty-state"><h2>No games found for this date</h2></div>'; return;}
   results.sort(function(a,b){return a.p.name.localeCompare(b.p.name);});
   var pitchers=results.filter(function(r){return r.p.type==='pitcher';});
   var hitters=results.filter(function(r){return r.p.type==='hitter';});
@@ -921,7 +907,7 @@ async function loadRecap() {
 async function loadWorkload() {
   var pitchers=players.filter(function(p){return p.type==='pitcher';});
   var box=document.getElementById('workload-content');
-  if (!pitchers.length) { box.innerHTML='<div class="empty-state"><h2>No pitchers on your roster yet</h2></div>'; return; }
+  if (!pitchers.length) {box.innerHTML='<div class="empty-state"><h2>No pitchers on your roster yet</h2></div>'; return;}
   box.innerHTML='<div class="loading"><span class="spinner"></span>Loading workload data...</div>';
   var results=[];
   await Promise.all(pitchers.map(async function(p){
