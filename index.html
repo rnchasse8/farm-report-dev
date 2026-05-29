@@ -3,27 +3,26 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>The Farm Report DEV</title>
+<title>The Farm Report</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   :root {
-    --bg: #0f0a08; --bg2: #1a1008; --bg3: #241808;
-    --border: #3a2a1a; --yellow: #ff6b35; --yellow2: #e55a25;
-    --text: #fff4ee; --muted: #aa7a5a; --red: #e05252; --green: #52c97a;
+    --bg: #080c10; --bg2: #0d1520; --bg3: #111d2e;
+    --border: #1a2e44; --yellow: #64d2ff; --yellow2: #3ab8f0;
+    --text: #e8f4ff; --muted: #5a8aaa; --red: #e05252; --green: #52c97a;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
-  header { background: var(--bg2); border-bottom: 2px solid var(--yellow); padding: 0 24px; display: flex; align-items: center; justify-content: space-between; height: 60px; box-shadow: 0 0 24px rgba(255,107,53,0.08); }
+  header { background: var(--bg2); border-bottom: 2px solid var(--yellow); padding: 0 24px; display: flex; align-items: center; justify-content: space-between; height: 60px; box-shadow: 0 0 24px rgba(100,210,255,0.08); }
   .logo { font-size: 1.3rem; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; }
-  .logo span { color: var(--yellow); text-shadow: 0 0 12px rgba(255,107,53,0.5); }
-  .dev-badge { font-size: 0.7rem; background: var(--yellow); color: #0f0a08; padding: 2px 8px; border-radius: 4px; margin-left: 8px; vertical-align: middle; font-weight: 800; }
+  .logo span { color: var(--yellow); text-shadow: 0 0 12px rgba(100,210,255,0.5); }
   .header-right { display: flex; gap: 12px; align-items: center; }
   select.season-sel { background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 4px; font-size: 0.85rem; cursor: pointer; }
   .search-bar { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; gap: 12px; align-items: center; }
   .search-bar input { flex: 1; max-width: 400px; background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 10px 14px; border-radius: 4px; font-size: 0.95rem; }
   .search-bar input::placeholder { color: var(--muted); }
   .search-bar input:focus { outline: none; border-color: var(--yellow); }
-  .btn { background: var(--yellow); color: #0f0a08; border: none; padding: 10px 20px; border-radius: 4px; font-weight: 700; cursor: pointer; font-size: 0.9rem; letter-spacing: 1px; text-transform: uppercase; }
+  .btn { background: var(--yellow); color: #050d16; border: none; padding: 10px 20px; border-radius: 4px; font-weight: 700; cursor: pointer; font-size: 0.9rem; letter-spacing: 1px; text-transform: uppercase; }
   .btn:hover { background: var(--yellow2); }
   .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text); padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
   .btn-ghost:hover { border-color: var(--yellow); color: var(--yellow); }
@@ -35,7 +34,7 @@
   .tabs-bar { background: var(--bg2); padding: 0 24px; display: flex; border-bottom: 1px solid var(--border); overflow-x: auto; }
   .tab { padding: 14px 20px; cursor: pointer; font-weight: 700; font-size: 0.9rem; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); border-bottom: 3px solid transparent; transition: all 0.15s; white-space: nowrap; }
   .tab.active { color: var(--yellow); border-bottom-color: var(--yellow); }
-  .tab .cnt { background: var(--yellow); color: #0f0a08; border-radius: 12px; padding: 1px 7px; font-size: 0.75rem; margin-left: 6px; }
+  .tab .cnt { background: var(--yellow); color: #050d16; border-radius: 12px; padding: 1px 7px; font-size: 0.75rem; margin-left: 6px; }
   .content { padding: 24px; }
   .meta-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; color: var(--muted); font-size: 0.82rem; }
   table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
@@ -67,7 +66,7 @@
   .chart-title { font-size: 0.8rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
   .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; margin-bottom: 24px; }
   .stat-card { background: var(--bg3); border-radius: 6px; padding: 14px; text-align: center; }
-  .stat-card .val { font-size: 1.5rem; font-weight: 800; color: var(--yellow); text-shadow: 0 0 10px rgba(255,107,53,0.4); }
+  .stat-card .val { font-size: 1.5rem; font-weight: 800; color: var(--yellow); text-shadow: 0 0 10px rgba(100,210,255,0.4); }
   .stat-card .lbl { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
   .empty-state { text-align: center; padding: 60px 24px; color: var(--muted); }
   .empty-state h2 { font-size: 1.2rem; margin-bottom: 8px; color: var(--text); }
@@ -84,7 +83,7 @@
 <body>
 
 <header>
-  <div class="logo"><span>The Farm</span> Report <span class="dev-badge">DEV</span></div>
+  <div class="logo"><span>The Farm</span> Report</div>
   <div class="header-right">
     <select class="season-sel" id="seasonSel" onchange="onSeasonChange()">
       <option value="2026">Season 2026</option>
@@ -186,8 +185,18 @@
 
   <div id="view-recap" style="display:none">
     <div class="meta-bar" style="margin-bottom:20px">
-      <span id="recap-date-label">Loading yesterday's games...</span>
-      <button class="btn-ghost" onclick="loadRecap()">↻ Refresh</button>
+      <span id="recap-date-label">Loading...</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div style="display:flex;gap:4px;">
+          <button id="recap-btn-0" class="btn-ghost" onclick="setRecapDay(0)" style="font-size:0.8rem;padding:6px 10px">Today</button>
+          <button id="recap-btn-1" class="btn-ghost" onclick="setRecapDay(1)" style="font-size:0.8rem;padding:6px 10px">-1</button>
+          <button id="recap-btn-2" class="btn-ghost" onclick="setRecapDay(2)" style="font-size:0.8rem;padding:6px 10px">-2</button>
+          <button id="recap-btn-3" class="btn-ghost" onclick="setRecapDay(3)" style="font-size:0.8rem;padding:6px 10px">-3</button>
+          <button id="recap-btn-4" class="btn-ghost" onclick="setRecapDay(4)" style="font-size:0.8rem;padding:6px 10px">-4</button>
+          <button id="recap-btn-5" class="btn-ghost" onclick="setRecapDay(5)" style="font-size:0.8rem;padding:6px 10px">-5</button>
+        </div>
+        <button class="btn-ghost" onclick="loadRecap()">↻ Refresh</button>
+      </div>
     </div>
     <div id="recap-content"><div class="loading"><span class="spinner"></span>Loading...</div></div>
   </div>
@@ -226,7 +235,6 @@ var SPORT_IDS = [1,11,12,13,14,15,16];
 
 function proxiedFetch(url) { return fetch(url); }
 
-// Fetch stats across ALL levels and combine — for season totals
 async function fetchAllLevels(buildUrl) {
   var seen = {};
   var allSplits = [];
@@ -248,7 +256,6 @@ async function fetchAllLevels(buildUrl) {
   return allSplits;
 }
 
-// Fetch game log — stop at first level with data
 async function fetchWithSportIdFallback(buildUrl) {
   for (var i = 0; i < SPORT_IDS.length; i++) {
     try {
@@ -262,10 +269,47 @@ async function fetchWithSportIdFallback(buildUrl) {
   return [];
 }
 
+async function fetchAllGameLogs(buildUrl) {
+  var seen = {};
+  var allSplits = [];
+  for (var i = 0; i < SPORT_IDS.length; i++) {
+    try {
+      var r = await proxiedFetch(buildUrl(SPORT_IDS[i]));
+      if (!r.ok) continue;
+      var d = await r.json();
+      var splits = d.stats && d.stats[0] && d.stats[0].splits ? d.stats[0].splits : [];
+      splits.forEach(function(s) {
+        var gameKey = s.date + '-' + (s.opponent && s.opponent.id ? s.opponent.id : '') + '-' + (s.stat.inningsPitched || s.stat.atBats || '');
+        if (!seen[gameKey]) {
+          seen[gameKey] = true;
+          allSplits.push(s);
+        }
+      });
+    } catch(e) {}
+  }
+  allSplits.sort(function(a, b) {
+    return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
+  });
+  return allSplits;
+}
+  var group = p.type==='pitcher'?'pitching':'hitting';
+  for (var i = 0; i < SPORT_IDS.length; i++) {
+    try {
+      var r = await proxiedFetch(API+'/people/'+p.id+'/stats?stats=gameLog&season='+season+'&group='+group+'&sportId='+SPORT_IDS[i]);
+      if (!r.ok) continue;
+      var d = await r.json();
+      var splits = d.stats && d.stats[0] && d.stats[0].splits ? d.stats[0].splits : [];
+      var game = splits.find(function(s){return s.date===dateStr;});
+      if (game) return game;
+    } catch(e) {}
+  }
+  return null;
+}
+
 var season = 2026;
 var currentTab = 'pitchers';
 var modalTab = 'overview';
-var players = JSON.parse(localStorage.getItem('farmPlayersDev') || '[]');
+var players = JSON.parse(localStorage.getItem('farmPlayers') || '[]');
 var statsCache = {};
 var sortState = { pitchers: { col: 'era', dir: 1 }, hitters: { col: 'avg', dir: 1 } };
 var currentModalPlayer = null;
@@ -385,7 +429,7 @@ function saveNote(id, text) {
 function notesHTML(id) {
   var note = getNotes(id);
   var clearBtn = note ? '<button onclick="saveNote('+id+', \'\'); document.getElementById(\'note-'+id+'\').value=\'\'" style="margin-top:8px;margin-left:8px;background:transparent;color:var(--red);border:1px solid var(--red);padding:8px 16px;border-radius:4px;font-weight:700;cursor:pointer;font-size:0.85rem">Clear</button>' : '';
-  return '<div style="margin-top:8px"><div class="chart-title" style="margin-bottom:8px">Scouting Notes</div><textarea id="note-'+id+'" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:10px;font-size:0.9rem;font-family:Segoe UI,sans-serif;resize:vertical;min-height:80px;outline:none" placeholder="Add scouting notes...">'+note+'</textarea><button onclick="saveNote('+id+', document.getElementById(\'note-'+id+'\').value)" style="margin-top:8px;background:var(--yellow);color:#0f0a08;border:none;padding:8px 16px;border-radius:4px;font-weight:700;cursor:pointer;font-size:0.85rem">Save Note</button>'+clearBtn+'</div>';
+  return '<div style="margin-top:8px"><div class="chart-title" style="margin-bottom:8px">Scouting Notes</div><textarea id="note-'+id+'" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:10px;font-size:0.9rem;font-family:Segoe UI,sans-serif;resize:vertical;min-height:80px;outline:none" placeholder="Add scouting notes, injury status, things to watch...">'+note+'</textarea><button onclick="saveNote('+id+', document.getElementById(\'note-'+id+'\').value)" style="margin-top:8px;background:var(--yellow);color:#050d16;border:none;padding:8px 16px;border-radius:4px;font-weight:700;cursor:pointer;font-size:0.85rem">Save Note</button>'+clearBtn+'</div>';
 }
 
 function pitcherTrend(splits) {
@@ -502,7 +546,7 @@ function switchTab(tab) {
     document.getElementById('view-'+t).style.display = t===tab?'block':'none';
   });
   if (tab==='gamelog') updateGameLogDropdown();
-  if (tab==='recap') loadRecap();
+  if (tab==='recap') { setRecapDay(1); }
   if (tab==='workload') loadWorkload();
 }
 
@@ -576,7 +620,7 @@ function removePlayer(id, type) {
   savePlayers(); renderAll();
 }
 
-function savePlayers() { localStorage.setItem('farmPlayersDev', JSON.stringify(players)); }
+function savePlayers() { localStorage.setItem('farmPlayers', JSON.stringify(players)); }
 
 async function refreshStatuses() {
   showToast('Refreshing statuses...');
@@ -594,21 +638,7 @@ async function refreshStatuses() {
   savePlayers(); renderAll(); showToast('Statuses updated!');
 }
 
-async function findYesterdayGame(p, dateStr) {
-  var group = p.type==='pitcher'?'pitching':'hitting';
-  for (var i = 0; i < SPORT_IDS.length; i++) {
-    try {
-      var r = await proxiedFetch(API+'/people/'+p.id+'/stats?stats=gameLog&season='+season+'&group='+group+'&sportId='+SPORT_IDS[i]);
-      if (!r.ok) continue;
-      var d = await r.json();
-      var splits = d.stats && d.stats[0] && d.stats[0].splits ? d.stats[0].splits : [];
-      var game = splits.find(function(s){return s.date===dateStr;});
-      if (game) return game;
-    } catch(e) {}
-  }
-  return null;
-}
-  function updateGameLogDropdown() {
+function updateGameLogDropdown() {
   var sel = document.getElementById('gamelogPlayerSel');
   var cur = sel.value;
   sel.innerHTML = '<option value="">— Select a player —</option>' +
@@ -627,7 +657,7 @@ async function loadGameLog() {
   box.innerHTML='<div class="loading"><span class="spinner"></span>Loading game log...</div>';
   var p = players.find(function(pl){return pl.id===id&&pl.type===type;});
   var group = p.type==='pitcher'?'pitching':'hitting';
-  var splits = await fetchWithSportIdFallback(function(sid){
+  var splits = await fetchAllGameLogs(function(sid){
     return API+'/people/'+id+'/stats?stats=gameLog&season='+season+'&group='+group+'&sportId='+sid;
   });
   if (!splits.length) { box.innerHTML='<div class="empty-state"><h2>No game log data found</h2></div>'; return; }
@@ -765,7 +795,7 @@ async function renderModalCharts(p) {
       box.innerHTML='<div class="chart-title">Season Rolling ERA</div><div class="chart-wrap"><canvas id="chart-era"></canvas></div>'+
         '<div class="chart-title">Season Rolling WHIP / FIP</div><div class="chart-wrap"><canvas id="chart-wf"></canvas></div>';
       setTimeout(function(){
-        trendCharts['era']=new Chart(document.getElementById('chart-era'),{type:'line',data:{labels:labels,datasets:[{label:'ERA',data:eras,borderColor:'#ff6b35',tension:0.3,pointRadius:3,fill:false}]},options:chartOpts()});
+        trendCharts['era']=new Chart(document.getElementById('chart-era'),{type:'line',data:{labels:labels,datasets:[{label:'ERA',data:eras,borderColor:'#64d2ff',tension:0.3,pointRadius:3,fill:false}]},options:chartOpts()});
         trendCharts['wf']=new Chart(document.getElementById('chart-wf'),{type:'line',data:{labels:labels,datasets:[{label:'WHIP',data:whips,borderColor:'#52c97a',tension:0.3,pointRadius:3,fill:false},{label:'FIP',data:fips,borderColor:'#e05252',tension:0.3,pointRadius:3,fill:false}]},options:chartOpts()});
       },50);
     } else {
@@ -785,7 +815,7 @@ async function renderModalCharts(p) {
       });
       box.innerHTML='<div class="chart-title">Season Rolling AVG / OBP / SLG</div><div class="chart-wrap"><canvas id="chart-avg"></canvas></div>';
       setTimeout(function(){
-        trendCharts['avg']=new Chart(document.getElementById('chart-avg'),{type:'line',data:{labels:labels,datasets:[{label:'AVG',data:avgs,borderColor:'#ff6b35',tension:0.3,pointRadius:3,fill:false},{label:'OBP',data:obps,borderColor:'#52c97a',tension:0.3,pointRadius:3,fill:false},{label:'SLG',data:slgs,borderColor:'#e05252',tension:0.3,pointRadius:3,fill:false}]},options:chartOpts()});
+        trendCharts['avg']=new Chart(document.getElementById('chart-avg'),{type:'line',data:{labels:labels,datasets:[{label:'AVG',data:avgs,borderColor:'#64d2ff',tension:0.3,pointRadius:3,fill:false},{label:'OBP',data:obps,borderColor:'#52c97a',tension:0.3,pointRadius:3,fill:false},{label:'SLG',data:slgs,borderColor:'#e05252',tension:0.3,pointRadius:3,fill:false}]},options:chartOpts()});
       },50);
     }
   } catch(e) { box.innerHTML='<div class="empty-state"><h2>Failed to load chart data</h2></div>'; }
@@ -793,9 +823,9 @@ async function renderModalCharts(p) {
 
 function chartOpts() {
   return {responsive:true,maintainAspectRatio:false,
-    plugins:{legend:{labels:{color:'#aa7a5a',boxWidth:12}}},
-    scales:{x:{ticks:{color:'#aa7a5a',maxTicksLimit:10,maxRotation:45},grid:{color:'#3a2a1a'}},
-            y:{ticks:{color:'#aa7a5a'},grid:{color:'#3a2a1a'}}}};
+    plugins:{legend:{labels:{color:'#5a8aaa',boxWidth:12}}},
+    scales:{x:{ticks:{color:'#5a8aaa',maxTicksLimit:10,maxRotation:45},grid:{color:'#1a2e44'}},
+            y:{ticks:{color:'#5a8aaa'},grid:{color:'#1a2e44'}}}};
 }
 
 function switchModalTab(tab) {
@@ -807,14 +837,26 @@ function switchModalTab(tab) {
   else renderModalCharts(currentModalPlayer);
 }
 
+var recapDayOffset = 1;
+
+function setRecapDay(offset) {
+  recapDayOffset = offset;
+  for (var i=0; i<=5; i++) {
+    var btn = document.getElementById('recap-btn-'+i);
+    if (btn) btn.style.borderColor = i===offset ? 'var(--yellow)' : '';
+    if (btn) btn.style.color = i===offset ? 'var(--yellow)' : '';
+  }
+  loadRecap();
+}
+
 async function loadRecap() {
   if (!players.length) { document.getElementById('recap-content').innerHTML='<div class="empty-state"><h2>No players on your roster yet</h2></div>'; return; }
   var box = document.getElementById('recap-content');
-  box.innerHTML='<div class="loading"><span class="spinner"></span>Loading yesterday\'s stats...</div>';
-  var yesterday = new Date();
-  yesterday.setDate(yesterday.getDate()-1);
-  var dateStr = yesterday.toISOString().split('T')[0];
-  document.getElementById('recap-date-label').textContent='Recap for '+yesterday.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+  box.innerHTML='<div class="loading"><span class="spinner"></span>Loading stats...</div>';
+  var targetDate = new Date();
+  targetDate.setDate(targetDate.getDate()-recapDayOffset);
+  var dateStr = targetDate.toISOString().split('T')[0];
+  document.getElementById('recap-date-label').textContent='Recap for '+targetDate.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
   var results=[];
   var seen={};
   await Promise.all(players.map(async function(p){
@@ -882,7 +924,7 @@ async function loadWorkload() {
   box.innerHTML='<div class="loading"><span class="spinner"></span>Loading workload data...</div>';
   var results=[];
   await Promise.all(pitchers.map(async function(p){
-    var splits=await fetchWithSportIdFallback(function(sid){
+    var splits=await fetchAllGameLogs(function(sid){
       return API+'/people/'+p.id+'/stats?stats=gameLog&season='+season+'&group=pitching&sportId='+sid;
     });
     results.push({p:p,splits:splits.slice(-10).reverse()});
