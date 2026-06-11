@@ -333,7 +333,31 @@ async function findYesterdayGame(p, dateStr) {
 var season = 2026;
 var currentTab = 'pitchers';
 var modalTab = 'overview';
-var players = JSON.parse(localStorage.getItem('farmPlayersDev') || '[]');
+var players = (function() {
+  // Primary key for this (dev) build
+  try {
+    var stored = localStorage.getItem('farmPlayersDev');
+    if (stored) {
+      var p = JSON.parse(stored);
+      if (p && p.length > 0) return p;
+    }
+  } catch(e) {}
+  // One-time migration: pull roster from older Farm Report builds if present
+  var legacyKeys = ['farmPlayers', 'farmReportPlayers', 'farmPlayersList', 'players'];
+  for (var k = 0; k < legacyKeys.length; k++) {
+    try {
+      var legacy = localStorage.getItem(legacyKeys[k]);
+      if (!legacy) continue;
+      var parsed = JSON.parse(legacy);
+      if (parsed && parsed.length > 0) {
+        localStorage.setItem('farmPlayersDev', legacy); // copy into the dev key
+        console.log('Migrated ' + parsed.length + ' players from legacy key "' + legacyKeys[k] + '"');
+        return parsed;
+      }
+    } catch(e) {}
+  }
+  return [];
+})();
 var statsCache = {};
 var sortState = { pitchers: { col: 'era', dir: 1 }, hitters: { col: 'avg', dir: 1 } };
 var currentModalPlayer = null;
