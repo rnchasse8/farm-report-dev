@@ -7,9 +7,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   :root {
-    --bg: #080c10; --bg2: #0d1520; --bg3: #111d2e;
-    --border: #1a2e44; --yellow: #64d2ff; --yellow2: #3ab8f0;
-    --text: #e8f4ff; --muted: #5a8aaa; --red: #e05252; --green: #52c97a;
+    --bg: #0f0a08; --bg2: #1a1008; --bg3: #241808;
+    --border: #3a2a1a; --yellow: #ff6b35; --yellow2: #e55a25;
+    --text: #fff4ee; --muted: #aa7a5a; --red: #e05252; --green: #52c97a;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
@@ -83,7 +83,7 @@
 <body>
 
 <header>
-  <div class="logo"><span>The Farm</span> Report</div>
+  <div class="logo"><span>The Farm</span> Report <span style="font-size:0.7rem;background:var(--yellow);color:#0f0a08;padding:2px 8px;border-radius:4px;margin-left:8px;vertical-align:middle;font-weight:800">DEV</span></div>
   <div class="header-right">
     <select class="season-sel" id="seasonSel" onchange="onSeasonChange()">
       <option value="2026">Season 2026</option>
@@ -109,6 +109,7 @@
   <div class="tab" id="tab-gamelog" onclick="switchTab('gamelog')">Game Log</div>
   <div class="tab" id="tab-recap" onclick="switchTab('recap')">Daily Recap</div>
   <div class="tab" id="tab-workload" onclick="switchTab('workload')">Workload</div>
+  <div class="tab" id="tab-leaders" onclick="switchTab('leaders')">Leaderboards</div>
 </div>
 
 <div class="content">
@@ -202,7 +203,33 @@
     <div id="recap-content"><div class="loading"><span class="spinner"></span>Loading...</div></div>
   </div>
 
-  <div id="view-workload" style="display:none">
+  <div id="view-leaders" style="display:none">
+    <div class="meta-bar" style="margin-bottom:16px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select id="leaders-group" onchange="loadLeaders()" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:4px;font-size:0.85rem;cursor:pointer">
+          <option value="pitching">Pitching</option>
+          <option value="hitting">Hitting</option>
+        </select>
+        <select id="leaders-level" onchange="loadLeaders()" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:4px;font-size:0.85rem;cursor:pointer">
+          <option value="1">MLB</option>
+          <option value="11">Triple-A</option>
+          <option value="12" selected>Double-A</option>
+          <option value="13">High-A</option>
+          <option value="14">Single-A</option>
+        </select>
+        <select id="leaders-stat" onchange="loadLeaders()" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:4px;font-size:0.85rem;cursor:pointer">
+          <option value="earnedRunAverage">ERA</option>
+          <option value="walksAndHitsPerInningPitched">WHIP</option>
+          <option value="strikeoutsPer9Inn">K/9</option>
+          <option value="strikeouts">Strikeouts</option>
+          <option value="wins">Wins</option>
+          <option value="inningsPitched">Innings Pitched</option>
+        </select>
+        <button class="btn-ghost" onclick="loadLeaders()">↻ Refresh</button>
+      </div>
+    </div>
+    <div id="leaders-content"><div class="loading"><span class="spinner"></span>Loading...</div></div>
+  </div>
     <div class="meta-bar" style="margin-bottom:20px">
       <span>Last 10 outings per pitcher &nbsp;·&nbsp; <span style="color:var(--green)">■</span> &lt;85 &nbsp; <span style="color:#f5a623">■</span> 85-99 &nbsp; <span style="color:var(--red)">■</span> 100+</span>
       <button class="btn-ghost" onclick="loadWorkload()">↻ Refresh</button>
@@ -304,7 +331,7 @@ async function findYesterdayGame(p, dateStr) {
 var season = 2026;
 var currentTab = 'pitchers';
 var modalTab = 'overview';
-var players = JSON.parse(localStorage.getItem('farmPlayers') || '[]');
+var players = JSON.parse(localStorage.getItem('farmPlayersDev') || '[]');
 var statsCache = {};
 var sortState = { pitchers: { col: 'era', dir: 1 }, hitters: { col: 'avg', dir: 1 } };
 var currentModalPlayer = null;
@@ -530,13 +557,14 @@ function updateCounts() {
 
 function switchTab(tab) {
   currentTab=tab;
-  ['pitchers','hitters','gamelog','recap','workload'].forEach(function(t) {
+  ['pitchers','hitters','gamelog','recap','workload','leaders'].forEach(function(t) {
     document.getElementById('tab-'+t).className='tab'+(t===tab?' active':'');
     document.getElementById('view-'+t).style.display=t===tab?'block':'none';
   });
   if (tab==='gamelog') updateGameLogDropdown();
   if (tab==='recap') setRecapDay(1);
   if (tab==='workload') loadWorkload();
+  if (tab==='leaders') loadLeaders();
 }
 
 async function doSearch(inline) {
@@ -957,7 +985,72 @@ async function loadWorkload() {
   }).join('');
 }
 
-async function init() {
+async function loadLeaders() {
+  var group = document.getElementById('leaders-group').value;
+  var sportId = document.getElementById('leaders-level').value;
+  var stat = document.getElementById('leaders-stat').value;
+  var box = document.getElementById('leaders-content');
+
+  // Update stat options based on group
+  var statSel = document.getElementById('leaders-stat');
+  var pitchingStats = [
+    {v:'earnedRunAverage',l:'ERA'},
+    {v:'walksAndHitsPerInningPitched',l:'WHIP'},
+    {v:'strikeoutsPer9Inn',l:'K/9'},
+    {v:'strikeouts',l:'Strikeouts'},
+    {v:'wins',l:'Wins'},
+    {v:'inningsPitched',l:'Innings Pitched'}
+  ];
+  var hittingStats = [
+    {v:'battingAverage',l:'AVG'},
+    {v:'onBasePlusSlugging',l:'OPS'},
+    {v:'onBasePercentage',l:'OBP'},
+    {v:'sluggingPercentage',l:'SLG'},
+    {v:'homeRuns',l:'Home Runs'},
+    {v:'runsBattedIn',l:'RBI'},
+    {v:'stolenBases',l:'Stolen Bases'},
+    {v:'strikeoutRate',l:'K%'}
+  ];
+  var opts = group==='pitching' ? pitchingStats : hittingStats;
+  var curVal = statSel.value;
+  var validVals = opts.map(function(o){return o.v;});
+  statSel.innerHTML = opts.map(function(o){return '<option value="'+o.v+'">'+o.l+'</option>';}).join('');
+  if (validVals.indexOf(curVal)>=0) statSel.value=curVal;
+  stat = statSel.value;
+
+  box.innerHTML='<div class="loading"><span class="spinner"></span>Loading leaderboard...</div>';
+  try {
+    var url = API+'/stats/leaders?leaderCategories='+stat+'&season='+season+'&sportId='+sportId+'&leaderGameTypes=R&limit=25&hydrate=person,team';
+    var r = await proxiedFetch(url);
+    var d = await r.json();
+    var leaders = d.leagueLeaders && d.leagueLeaders[0] && d.leagueLeaders[0].leaders ? d.leagueLeaders[0].leaders : [];
+    if (!leaders.length) { box.innerHTML='<div class="empty-state"><h2>No leaderboard data found</h2></div>'; return; }
+
+    var rosterIds = players.map(function(p){return p.id;});
+    var statLabel = opts.find(function(o){return o.v===stat;});
+    var thS='padding:10px 8px;background:var(--bg2);color:var(--muted);font-size:0.78rem;letter-spacing:1px;border-bottom:1px solid var(--border);text-align:right';
+    var tdS='padding:10px 8px;border-bottom:1px solid var(--border);text-align:right';
+
+    box.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:0.85rem"><thead><tr>'+
+      '<th style="'+thS+';text-align:center;width:40px">#</th>'+
+      '<th style="'+thS+';text-align:left">Player</th>'+
+      '<th style="'+thS+'">Team</th>'+
+      '<th style="'+thS+'">'+(statLabel?statLabel.l:stat)+'</th>'+
+      '</tr></thead><tbody>'+
+      leaders.map(function(l) {
+        var onRoster = rosterIds.indexOf(l.person&&l.person.id) >= 0;
+        var rankColor = l.rank<=3 ? 'var(--yellow)' : 'var(--muted)';
+        var rowStyle = onRoster ? 'background:rgba(255,107,53,0.08);' : '';
+        var rosterBadge = onRoster ? '<span style="display:inline-block;font-size:0.65rem;font-weight:700;padding:1px 5px;border-radius:3px;background:var(--yellow);color:#0f0a08;margin-left:6px;vertical-align:middle">YOUR PLAYER</span>' : '';
+        return '<tr style="'+rowStyle+'">'+
+          '<td style="'+tdS+';text-align:center;font-weight:700;color:'+rankColor+'">'+l.rank+'</td>'+
+          '<td style="'+tdS+';text-align:left"><span style="font-weight:700">'+(l.person&&l.person.fullName||'—')+'</span>'+rosterBadge+'</td>'+
+          '<td style="'+tdS+';color:var(--muted)">'+(l.team&&l.team.name||'—')+'</td>'+
+          '<td style="'+tdS+';font-weight:700;color:var(--yellow)">'+l.value+'</td>'+
+          '</tr>';
+      }).join('')+'</tbody></table>';
+  } catch(e) { box.innerHTML='<div class="empty-state"><h2>Failed to load leaderboard</h2></div>'; }
+}
   document.getElementById('lastUpdated').textContent='Loading...';
   await Promise.all(players.map(function(p){return fetchStats(p);}));
   renderAll();
