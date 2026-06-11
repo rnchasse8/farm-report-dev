@@ -1050,7 +1050,8 @@ async function loadLeaders() {
           '</tr>';
       }).join('')+'</tbody></table>';
   } catch(e) { box.innerHTML='<div class="empty-state"><h2>Failed to load leaderboard</h2></div>'; }
-}async function init() {
+}
+  async function init() {
   document.getElementById('lastUpdated').textContent='Loading...';
   await Promise.all(players.map(function(p){return fetchStats(p);}));
   renderAll();
