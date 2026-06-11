@@ -1022,8 +1022,8 @@ async function loadLeaders() {
     {v:'wins',l:'Wins'},{v:'inningsPitched',l:'Innings Pitched'}
   ];
   var hittingStats=[
-    {v:'avg',l:'AVG'},{v:'ops',l:'OPS'},
-    {v:'obp',l:'OBP'},{v:'slg',l:'SLG'},
+    {v:'battingAverage',l:'AVG'},{v:'onBasePlusSlugging',l:'OPS'},
+    {v:'onBasePercentage',l:'OBP'},{v:'sluggingPercentage',l:'SLG'},
     {v:'homeRuns',l:'Home Runs'},{v:'runsBattedIn',l:'RBI'},
     {v:'stolenBases',l:'Stolen Bases'}
   ];
@@ -1035,7 +1035,7 @@ async function loadLeaders() {
   var stat=statSel.value;
   box.innerHTML='<div class="loading"><span class="spinner"></span>Loading leaderboard...</div>';
   try {
-    var url=API+'/stats/leaders?leaderCategories='+stat+'&season='+season+'&sportId='+sportId+'&leaderGameTypes=R&limit=25&hydrate=person,team';
+    var url=API+'/stats/leaders?leaderCategories='+stat+'&statGroup='+group+'&season='+season+'&sportId='+sportId+'&leaderGameTypes=R&limit=25&hydrate=person,team';
     var r=await proxiedFetch(url);
     var d=await r.json();
     var leaders=d.leagueLeaders&&d.leagueLeaders[0]&&d.leagueLeaders[0].leaders?d.leagueLeaders[0].leaders:[];
