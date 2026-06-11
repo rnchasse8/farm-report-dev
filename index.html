@@ -998,10 +998,10 @@ async function loadLeaders() {
     {v:'wins',l:'Wins'},{v:'inningsPitched',l:'Innings Pitched'}
   ];
   var hittingStats=[
-    {v:'battingAverage',l:'AVG',asc:false},{v:'onBasePlusSlugging',l:'OPS',asc:false},
-    {v:'onBasePercentage',l:'OBP',asc:false},{v:'sluggingPercentage',l:'SLG',asc:false},
-    {v:'homeRuns',l:'Home Runs',asc:false},{v:'runsBattedIn',l:'RBI',asc:false},
-    {v:'stolenBases',l:'Stolen Bases',asc:false}
+    {v:'avg',l:'AVG'},{v:'ops',l:'OPS'},
+    {v:'obp',l:'OBP'},{v:'slg',l:'SLG'},
+    {v:'homeRuns',l:'Home Runs'},{v:'runsBattedIn',l:'RBI'},
+    {v:'stolenBases',l:'Stolen Bases'}
   ];
   var opts=group==='pitching'?pitchingStats:hittingStats;
   var curVal=statSel.value;
