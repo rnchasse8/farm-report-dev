@@ -531,7 +531,7 @@ function renderPitchers() {
     var splits=(statsCache[key]&&statsCache[key].splits)||[];
     var note=getNotes(p.id);
     var noteHTML=note?'<span style="display:block;font-size:0.72rem;color:#f5a623;margin-top:2px;font-style:italic">Note: '+(note.length>40?note.substring(0,40)+'…':note)+'</span>':'';
-    if (!s) return '<tr><td><span class="player-name" onclick="openModal('+p.id+')">'+p.name+'</span><span class="team-tag">'+(p.team||'—')+' · P</span></td><td colspan="20" style="color:var(--muted);font-style:italic;font-size:0.82rem">Not appeared this season.</td></tr>';
+    if (!s) return '<tr><td><span class="player-name" onclick="openModal('+p.id+')">'+p.name+'</span><span class="team-tag">'+(p.team||'—')+' · P</span></td><td colspan="19" style="color:var(--muted);font-style:italic;font-size:0.82rem">Not appeared this season.</td><td><button class="remove-btn" onclick="removePlayer('+p.id+',\'pitcher\')">✕</button></td></tr>';
     var trend=pitcherTrend(splits);
     return '<tr><td><span class="player-name" onclick="openModal('+p.id+')">'+p.name+'</span>'+statusBadge(p.status)+'<span class="team-tag">'+(p.team||'—')+' · P</span>'+noteHTML+'</td>'+
       '<td>'+fmt(s.w)+'</td><td>'+fmt(s.l)+'</td><td>'+fmt(s.g)+'</td><td>'+fmt(s.gs)+'</td>'+
@@ -556,7 +556,7 @@ function renderHitters() {
     var splits=(statsCache[key]&&statsCache[key].splits)||[];
     var note=getNotes(p.id);
     var noteHTML=note?'<span style="display:block;font-size:0.72rem;color:#f5a623;margin-top:2px;font-style:italic">Note: '+(note.length>40?note.substring(0,40)+'…':note)+'</span>':'';
-    if (!s) return '<tr><td><span class="player-name" onclick="openModal('+p.id+')">'+p.name+'</span><span class="team-tag">'+(p.team||'—')+' · '+(p.pos||'OF')+'</span></td><td colspan="14" style="color:var(--muted);font-style:italic;font-size:0.82rem">Not appeared this season.</td></tr>';
+    if (!s) return '<tr><td><span class="player-name" onclick="openModal('+p.id+')">'+p.name+'</span><span class="team-tag">'+(p.team||'—')+' · '+(p.pos||'OF')+'</span></td><td colspan="13" style="color:var(--muted);font-style:italic;font-size:0.82rem">Not appeared this season.</td><td><button class="remove-btn" onclick="removePlayer('+p.id+',\'hitter\')">✕</button></td></tr>';
     var trend=hitterTrend(splits);
     return '<tr><td><span class="player-name" onclick="openModal('+p.id+')">'+p.name+'</span>'+statusBadge(p.status)+'<span class="team-tag">'+(p.team||'—')+' · '+(p.pos||'OF')+'</span>'+noteHTML+'</td>'+
       '<td>'+fmt(s.g)+'</td><td>'+fmt(s.ab)+'</td>'+
