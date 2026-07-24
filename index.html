@@ -142,6 +142,7 @@
         <th onclick="sortTable('pitchers','strikePct')">STR%</th>
         <th onclick="sortTable('pitchers','pitchesPerGame')">P/G</th>
         <th onclick="sortTable('pitchers','irsPct')">IRS%</th>
+        <th onclick="sortTable('pitchers','eraPlus')">ERA+</th>
         <th></th>
       </tr></thead>
       <tbody id="pitcher-body"></tbody>
@@ -168,6 +169,7 @@
         <th onclick="sortTable('hitters','bbPct')">BB%</th>
         <th onclick="sortTable('hitters','sb')">SB</th>
         <th onclick="sortTable('hitters','cs')">CS</th>
+        <th onclick="sortTable('hitters','wrcPlus')">wRC+</th>
         <th></th>
       </tr></thead>
       <tbody id="hitter-body"></tbody>
@@ -205,9 +207,12 @@
   </div>
 
   <div id="view-workload" style="display:none">
-    <div class="meta-bar" style="margin-bottom:20px">
-      <span>Last 10 outings per pitcher &nbsp;·&nbsp; <span style="color:var(--green)">■</span> &lt;85 &nbsp; <span style="color:#f5a623">■</span> 85-99 &nbsp; <span style="color:var(--red)">■</span> 100+</span>
+    <div class="game-log-controls" style="margin-bottom:16px">
+      <select id="workloadPitcherSel" onchange="renderWorkloadView()"><option value="">— All Pitchers —</option></select>
       <button class="btn-ghost" onclick="loadWorkload()">↻ Refresh</button>
+    </div>
+    <div class="meta-bar" style="margin-bottom:16px">
+      <span>Last 10 outings per pitcher &nbsp;·&nbsp; <span style="color:var(--green)">■</span> &lt;85 &nbsp; <span style="color:#f5a623">■</span> 85-99 &nbsp; <span style="color:var(--red)">■</span> 100+</span>
     </div>
     <div id="workload-content"><div class="loading"><span class="spinner"></span>Loading...</div></div>
   </div>
@@ -373,6 +378,10 @@ var currentModalPlayer = null;
 var trendCharts = {};
 var searchTimeout;
 var recapDayOffset = 1;
+var leagueContext = null;
+var leagueContextCache = {};
+var workloadData = [];
+var workloadExpanded = {};
 
 function showToast(msg) {
   var t = document.getElementById('toast');
@@ -388,7 +397,8 @@ function onSeasonChange() {
 async function refreshAll() {
   document.getElementById('lastUpdated').textContent = 'Refreshing...';
   statsCache = {};
-  await Promise.all(players.map(function(p) { return fetchStats(p); }));
+  await Promise.all([Promise.all(players.map(function(p) { return fetchStats(p); })), refreshLeagueContext()]);
+  applyLeagueAdjustedStats();
   renderAll();
   document.getElementById('lastUpdated').textContent = 'Last updated: ' + new Date().toLocaleString();
 }
@@ -452,14 +462,80 @@ function aggregateSplits(splits, type) {
     var ops=pa>0&&ab>0?((h+bb+hbp)/pa+tb/ab).toFixed(3):'—';
     var kPct=pa>0?(so/pa*100).toFixed(1)+'%':'—';
     var bbPct=pa>0?(bb/pa*100).toFixed(1)+'%':'—';
+    var singlesP=h-doubles-triples-hr;
+    var wOBA=pa>0?(0.69*bb+0.72*hbp+0.89*singlesP+1.27*doubles+1.62*triples+2.10*hr)/pa:null;
     return {g:g,ab:ab,h:h,doubles:doubles,triples:triples,hr:hr,rbi:rbi,r:r,bb:bb,so:so,
-            sb:sb,cs:cs,hbp:hbp,sf:sf,avg:avg,obp:obp,slg:slg,ops:ops,kPct:kPct,bbPct:bbPct};
+            sb:sb,cs:cs,hbp:hbp,sf:sf,avg:avg,obp:obp,slg:slg,ops:ops,kPct:kPct,bbPct:bbPct,wOBA:wOBA};
   }
 }
 
 function fmt(v) {
   if (v===null||v===undefined||v==='—'||v==='') return '<span class="dash">—</span>';
   return v;
+}
+
+async function getLeagueContext(seasonYear) {
+  if (leagueContextCache[seasonYear]) return leagueContextCache[seasonYear];
+  var hAB=0,hH=0,h2b=0,h3b=0,hHR=0,hBB=0,hHBP=0,hSF=0;
+  var pER=0,pIP=0;
+  for (var i=0;i<SPORT_IDS.length;i++) {
+    var sid=SPORT_IDS[i];
+    try {
+      var rH=await proxiedFetch(API+'/teams/stats?season='+seasonYear+'&sportIds='+sid+'&stats=season&group=hitting');
+      if (rH.ok) {
+        var dH=await rH.json();
+        var splitsH=dH.stats&&dH.stats[0]&&dH.stats[0].splits?dH.stats[0].splits:[];
+        splitsH.forEach(function(s){
+          var st=s.stat;
+          hAB+=st.atBats||0; hH+=st.hits||0; h2b+=st.doubles||0; h3b+=st.triples||0; hHR+=st.homeRuns||0;
+          hBB+=(st.baseOnBalls||0)+(st.intentionalWalks||0); hHBP+=st.hitByPitch||0; hSF+=st.sacFlies||0;
+        });
+      }
+    } catch(e) {}
+    try {
+      var rP=await proxiedFetch(API+'/teams/stats?season='+seasonYear+'&sportIds='+sid+'&stats=season&group=pitching');
+      if (rP.ok) {
+        var dP=await rP.json();
+        var splitsP=dP.stats&&dP.stats[0]&&dP.stats[0].splits?dP.stats[0].splits:[];
+        splitsP.forEach(function(s){
+          var st=s.stat;
+          pER+=st.earnedRuns||0; pIP+=Math.round(parseFloat(st.inningsPitched||0)*3);
+        });
+      }
+    } catch(e) {}
+  }
+  var lgPA=hAB+hBB+hHBP+hSF;
+  var singles=hH-h2b-h3b-hHR;
+  var lgWOBA=lgPA>0?(0.69*hBB+0.72*hHBP+0.89*singles+1.27*h2b+1.62*h3b+2.10*hHR)/lgPA:null;
+  var lgERA=pIP>0?(pER*27/pIP):null;
+  var ctx={wOBA:lgWOBA,era:lgERA};
+  leagueContextCache[seasonYear]=ctx;
+  return ctx;
+}
+
+async function refreshLeagueContext() {
+  try { leagueContext=await getLeagueContext(season); } catch(e) { leagueContext=null; }
+}
+
+function applyLeagueAdjustedStats() {
+  if (!leagueContext) return;
+  players.forEach(function(p) {
+    var key=p.id+'-'+season+'-'+p.type;
+    var entry=statsCache[key];
+    if (!entry||!entry.agg) return;
+    var s=entry.agg;
+    if (p.type==='pitcher') {
+      var eraNum=parseFloat(s.era);
+      s.eraPlus=(leagueContext.era&&!isNaN(eraNum)&&eraNum>0)?Math.round((leagueContext.era/eraNum)*100):null;
+    } else {
+      s.wrcPlus=(leagueContext.wOBA&&s.wOBA!=null)?Math.round((s.wOBA/leagueContext.wOBA)*100):null;
+    }
+  });
+}
+
+function statPlusColor(v) {
+  if (v===null||v===undefined) return 'var(--muted)';
+  return v>=110?'var(--green)':v<=90?'var(--red)':'var(--text)';
 }
 
 function extractStatus(person) {
@@ -531,7 +607,7 @@ function renderPitchers() {
     var splits=(statsCache[key]&&statsCache[key].splits)||[];
     var note=getNotes(p.id);
     var noteHTML=note?'<span style="display:block;font-size:0.72rem;color:#f5a623;margin-top:2px;font-style:italic">Note: '+(note.length>40?note.substring(0,40)+'…':note)+'</span>':'';
-    if (!s) return '<tr><td><span class="player-name" onclick="openModal('+p.id+')">'+p.name+'</span><span class="team-tag">'+(p.team||'—')+' · P</span></td><td colspan="19" style="color:var(--muted);font-style:italic;font-size:0.82rem">Not appeared this season.</td><td><button class="remove-btn" onclick="removePlayer('+p.id+',\'pitcher\')">✕</button></td></tr>';
+    if (!s) return '<tr><td><span class="player-name" onclick="openModal('+p.id+')">'+p.name+'</span><span class="team-tag">'+(p.team||'—')+' · P</span></td><td colspan="20" style="color:var(--muted);font-style:italic;font-size:0.82rem">Not appeared this season.</td><td><button class="remove-btn" onclick="removePlayer('+p.id+',\'pitcher\')">✕</button></td></tr>';
     var trend=pitcherTrend(splits);
     return '<tr><td><span class="player-name" onclick="openModal('+p.id+')">'+p.name+'</span>'+statusBadge(p.status)+'<span class="team-tag">'+(p.team||'—')+' · P</span>'+noteHTML+'</td>'+
       '<td>'+fmt(s.w)+'</td><td>'+fmt(s.l)+'</td><td>'+fmt(s.g)+'</td><td>'+fmt(s.gs)+'</td>'+
@@ -541,6 +617,7 @@ function renderPitchers() {
       '<td>'+fmt(s.whip)+trendIndicator(s.whip,trend.whip,true)+'</td>'+
       '<td>'+fmt(s.baa)+'</td><td>'+fmt(s.slgAgainst)+'</td><td>'+fmt(s.hr)+'</td>'+
       '<td>'+fmt(s.strikePct)+'</td><td>'+fmt(s.pitchesPerGame)+'</td><td>'+fmt(s.irsPct)+'</td>'+
+      '<td style="font-weight:700;color:'+statPlusColor(s.eraPlus)+'">'+fmt(s.eraPlus)+'</td>'+
       '<td><button class="remove-btn" onclick="removePlayer('+p.id+',\'pitcher\')">✕</button></td></tr>';
   }).join('');
 }
@@ -556,7 +633,7 @@ function renderHitters() {
     var splits=(statsCache[key]&&statsCache[key].splits)||[];
     var note=getNotes(p.id);
     var noteHTML=note?'<span style="display:block;font-size:0.72rem;color:#f5a623;margin-top:2px;font-style:italic">Note: '+(note.length>40?note.substring(0,40)+'…':note)+'</span>':'';
-    if (!s) return '<tr><td><span class="player-name" onclick="openModal('+p.id+')">'+p.name+'</span><span class="team-tag">'+(p.team||'—')+' · '+(p.pos||'OF')+'</span></td><td colspan="13" style="color:var(--muted);font-style:italic;font-size:0.82rem">Not appeared this season.</td><td><button class="remove-btn" onclick="removePlayer('+p.id+',\'hitter\')">✕</button></td></tr>';
+    if (!s) return '<tr><td><span class="player-name" onclick="openModal('+p.id+')">'+p.name+'</span><span class="team-tag">'+(p.team||'—')+' · '+(p.pos||'OF')+'</span></td><td colspan="14" style="color:var(--muted);font-style:italic;font-size:0.82rem">Not appeared this season.</td><td><button class="remove-btn" onclick="removePlayer('+p.id+',\'hitter\')">✕</button></td></tr>';
     var trend=hitterTrend(splits);
     return '<tr><td><span class="player-name" onclick="openModal('+p.id+')">'+p.name+'</span>'+statusBadge(p.status)+'<span class="team-tag">'+(p.team||'—')+' · '+(p.pos||'OF')+'</span>'+noteHTML+'</td>'+
       '<td>'+fmt(s.g)+'</td><td>'+fmt(s.ab)+'</td>'+
@@ -565,6 +642,7 @@ function renderHitters() {
       '<td>'+fmt(s.hr)+'</td><td>'+fmt(s.rbi)+'</td><td>'+fmt(s.r)+'</td>'+
       '<td>'+fmt(s.kPct)+'</td><td>'+fmt(s.bbPct)+'</td>'+
       '<td>'+fmt(s.sb)+'</td><td>'+fmt(s.cs)+'</td>'+
+      '<td style="font-weight:700;color:'+statPlusColor(s.wrcPlus)+'">'+fmt(s.wrcPlus)+'</td>'+
       '<td><button class="remove-btn" onclick="removePlayer('+p.id+',\'hitter\')">✕</button></td></tr>';
   }).join('');
 }
@@ -806,6 +884,7 @@ async function renderModalOverview(p) {
       '<div class="stat-card"><div class="val">'+s.strikePct+'</div><div class="lbl">STR%</div></div>'+
       '<div class="stat-card"><div class="val">'+s.pitchesPerGame+'</div><div class="lbl">P/G</div></div>'+
       '<div class="stat-card"><div class="val">'+s.irsPct+'</div><div class="lbl">IRS%</div></div>'+
+      '<div class="stat-card"><div class="val" style="color:'+statPlusColor(s.eraPlus)+'">'+(s.eraPlus!=null?s.eraPlus:'—')+'</div><div class="lbl">ERA+</div></div>'+
       '</div>'+notesHTML(p.id);
   } else {
     box.innerHTML='<div class="stat-grid">'+
@@ -819,6 +898,7 @@ async function renderModalOverview(p) {
       '<div class="stat-card"><div class="val">'+s.kPct+'</div><div class="lbl">K%</div></div>'+
       '<div class="stat-card"><div class="val">'+s.bbPct+'</div><div class="lbl">BB%</div></div>'+
       '<div class="stat-card"><div class="val">'+s.sb+'/'+s.cs+'</div><div class="lbl">SB/CS</div></div>'+
+      '<div class="stat-card"><div class="val" style="color:'+statPlusColor(s.wrcPlus)+'">'+(s.wrcPlus!=null?s.wrcPlus:'—')+'</div><div class="lbl">wRC+</div></div>'+
       '</div>'+notesHTML(p.id);
   }
 }
@@ -971,7 +1051,8 @@ async function loadRecap() {
 async function loadWorkload() {
   var pitchers=players.filter(function(p){return p.type==='pitcher';});
   var box=document.getElementById('workload-content');
-  if (!pitchers.length) {box.innerHTML='<div class="empty-state"><h2>No pitchers on your roster yet</h2></div>'; return;}
+  var sel=document.getElementById('workloadPitcherSel');
+  if (!pitchers.length) {box.innerHTML='<div class="empty-state"><h2>No pitchers on your roster yet</h2></div>'; sel.innerHTML='<option value="">— All Pitchers —</option>'; workloadData=[]; return;}
   box.innerHTML='<div class="loading"><span class="spinner"></span>Loading workload data...</div>';
   var results=[];
   await Promise.all(pitchers.map(async function(p){
@@ -981,44 +1062,95 @@ async function loadWorkload() {
     results.push({p:p,splits:splits.slice(-10).reverse()});
   }));
   results.sort(function(a,b){return a.p.name.localeCompare(b.p.name);});
+  workloadData=results;
+  var curSel=sel.value;
+  sel.innerHTML='<option value="">— All Pitchers —</option>'+
+    results.map(function(item){return '<option value="'+item.p.id+'">'+item.p.name+'</option>';}).join('');
+  if (curSel&&results.find(function(item){return String(item.p.id)===curSel;})) sel.value=curSel;
+  renderWorkloadView();
+}
+
+function workloadTable(splits) {
   var thS='padding:8px 10px;background:var(--bg3);color:var(--muted);font-size:0.78rem;letter-spacing:1px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap';
   var tdS='padding:8px 10px;border-bottom:1px solid var(--border);text-align:right;font-size:0.85rem';
-  box.innerHTML=results.map(function(item,i){
+  var totalPitches=splits.reduce(function(sum,s){return sum+(s.stat.numberOfPitches||0);},0);
+  var avgPitches=splits.length?(totalPitches/splits.length).toFixed(1):'—';
+  return '<table style="width:100%;border-collapse:collapse"><thead><tr>'+
+    '<th style="'+thS+';text-align:left">Date</th><th style="'+thS+'">Opponent</th>'+
+    '<th style="'+thS+'">IP</th><th style="'+thS+'">H</th><th style="'+thS+'">R</th>'+
+    '<th style="'+thS+'">ER</th><th style="'+thS+'">BB</th><th style="'+thS+'">SO</th>'+
+    '<th style="'+thS+'">Pitches</th></tr></thead><tbody>'+
+    splits.map(function(s){
+      var st=s.stat; var pitches=st.numberOfPitches||0;
+      var pc=pitches>=100?'var(--red)':pitches>=85?'#f5a623':'var(--text)';
+      return '<tr><td style="'+tdS+';text-align:left">'+(s.date||'—')+'</td>'+
+        '<td style="'+tdS+';color:var(--muted)">'+((s.opponent&&s.opponent.name)||'—')+'</td>'+
+        '<td style="'+tdS+'">'+(st.inningsPitched||'—')+'</td>'+
+        '<td style="'+tdS+'">'+(st.hits||0)+'</td><td style="'+tdS+'">'+(st.runs||0)+'</td>'+
+        '<td style="'+tdS+'">'+(st.earnedRuns||0)+'</td><td style="'+tdS+'">'+(st.baseOnBalls||0)+'</td>'+
+        '<td style="'+tdS+'">'+(st.strikeOuts||0)+'</td>'+
+        '<td style="'+tdS+';font-weight:700;color:'+pc+'">'+(pitches||'—')+'</td></tr>';
+    }).join('')+
+    '<tr style="background:var(--bg3)"><td style="'+tdS+';text-align:left;color:var(--muted);font-size:0.78rem;text-transform:uppercase;letter-spacing:1px" colspan="8">Totals / Avg</td>'+
+    '<td style="'+tdS+';font-weight:800;color:var(--yellow)">'+totalPitches+' <span style="font-weight:400;color:var(--muted);font-size:0.78rem">('+avgPitches+'/g)</span></td></tr>'+
+    '</tbody></table>';
+}
+
+function renderWorkloadDetail(item) {
+  var p=item.p,splits=item.splits;
+  if (!splits.length) return '<div style="padding:4px 0"><div style="font-weight:800;font-size:1rem">'+p.name+'</div><div style="color:var(--muted);font-size:0.85rem;margin-top:4px">'+(p.team||'—')+'</div><div style="color:var(--muted);font-size:0.85rem;margin-top:8px">No outings found this season.</div></div>';
+  var totalPitches=splits.reduce(function(sum,s){return sum+(s.stat.numberOfPitches||0);},0);
+  var avgPitches=(totalPitches/splits.length).toFixed(1);
+  var maxPitches=Math.max.apply(null,splits.map(function(s){return s.stat.numberOfPitches||0;}));
+  var maxColor=maxPitches>=100?'var(--red)':maxPitches>=85?'#f5a623':'var(--green)';
+  return '<div style="padding-top:4px">'+
+    '<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:6px">'+
+    '<span style="font-weight:800;font-size:1rem">'+p.name+'</span>'+
+    '<span style="color:var(--muted);font-size:0.85rem">'+(p.team||'—')+'</span></div>'+
+    '<div style="display:flex;gap:20px;margin-bottom:12px;font-size:0.82rem;color:var(--muted)">'+
+    '<span>Last '+splits.length+' outings</span>'+
+    '<span>Total: <strong style="color:var(--yellow)">'+totalPitches+'</strong></span>'+
+    '<span>Avg: <strong style="color:var(--yellow)">'+avgPitches+'</strong></span>'+
+    '<span>High: <strong style="color:'+maxColor+'">'+maxPitches+'</strong></span></div>'+
+    workloadTable(splits)+
+    '</div>';
+}
+
+function toggleWorkloadRow(id) {
+  workloadExpanded[id]=!workloadExpanded[id];
+  renderWorkloadView();
+}
+
+function renderWorkloadView() {
+  var box=document.getElementById('workload-content');
+  var sel=document.getElementById('workloadPitcherSel');
+  var selId=sel?sel.value:'';
+  if (!workloadData.length) {box.innerHTML='<div class="empty-state"><h2>No pitchers on your roster yet</h2></div>'; return;}
+  if (selId) {
+    var item=workloadData.find(function(w){return String(w.p.id)===selId;});
+    box.innerHTML=item?renderWorkloadDetail(item):'<div class="empty-state"><h2>Pitcher not found</h2></div>';
+    return;
+  }
+  box.innerHTML='<div style="border-top:1px solid var(--border)">'+workloadData.map(function(item){
     var p=item.p,splits=item.splits;
-    if (!splits.length) return '<div style="margin-bottom:28px"><div style="font-weight:800;font-size:1rem">'+p.name+'</div><div style="color:var(--muted);font-size:0.85rem;margin-top:4px">'+(p.team||'—')+'</div><div style="color:var(--muted);font-size:0.85rem;margin-top:8px">No outings found this season.</div></div>'+(i<results.length-1?'<hr style="border:none;border-top:1px solid var(--border);margin:0 0 28px">':'');
+    var expanded=!!workloadExpanded[p.id];
     var totalPitches=splits.reduce(function(sum,s){return sum+(s.stat.numberOfPitches||0);},0);
     var avgPitches=splits.length?(totalPitches/splits.length).toFixed(1):'—';
-    var maxPitches=Math.max.apply(null,splits.map(function(s){return s.stat.numberOfPitches||0;}));
+    var maxPitches=splits.length?Math.max.apply(null,splits.map(function(s){return s.stat.numberOfPitches||0;})):0;
     var maxColor=maxPitches>=100?'var(--red)':maxPitches>=85?'#f5a623':'var(--green)';
-    return '<div style="margin-bottom:28px">'+
-      '<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:6px">'+
-      '<span style="font-weight:800;font-size:1rem">'+p.name+'</span>'+
-      '<span style="color:var(--muted);font-size:0.85rem">'+(p.team||'—')+'</span></div>'+
-      '<div style="display:flex;gap:20px;margin-bottom:12px;font-size:0.82rem;color:var(--muted)">'+
-      '<span>Last '+splits.length+' outings</span>'+
-      '<span>Total: <strong style="color:var(--yellow)">'+totalPitches+'</strong></span>'+
+    var summaryHTML=splits.length?
+      '<div style="display:flex;gap:20px;font-size:0.82rem;color:var(--muted);align-items:center">'+
+      '<span>'+splits.length+' outings</span>'+
       '<span>Avg: <strong style="color:var(--yellow)">'+avgPitches+'</strong></span>'+
-      '<span>High: <strong style="color:'+maxColor+'">'+maxPitches+'</strong></span></div>'+
-      '<table style="width:100%;border-collapse:collapse"><thead><tr>'+
-      '<th style="'+thS+';text-align:left">Date</th><th style="'+thS+'">Opponent</th>'+
-      '<th style="'+thS+'">IP</th><th style="'+thS+'">H</th><th style="'+thS+'">R</th>'+
-      '<th style="'+thS+'">ER</th><th style="'+thS+'">BB</th><th style="'+thS+'">SO</th>'+
-      '<th style="'+thS+'">Pitches</th></tr></thead><tbody>'+
-      splits.map(function(s){
-        var st=s.stat; var pitches=st.numberOfPitches||0;
-        var pc=pitches>=100?'var(--red)':pitches>=85?'#f5a623':'var(--text)';
-        return '<tr><td style="'+tdS+';text-align:left">'+(s.date||'—')+'</td>'+
-          '<td style="'+tdS+';color:var(--muted)">'+((s.opponent&&s.opponent.name)||'—')+'</td>'+
-          '<td style="'+tdS+'">'+(st.inningsPitched||'—')+'</td>'+
-          '<td style="'+tdS+'">'+(st.hits||0)+'</td><td style="'+tdS+'">'+(st.runs||0)+'</td>'+
-          '<td style="'+tdS+'">'+(st.earnedRuns||0)+'</td><td style="'+tdS+'">'+(st.baseOnBalls||0)+'</td>'+
-          '<td style="'+tdS+'">'+(st.strikeOuts||0)+'</td>'+
-          '<td style="'+tdS+';font-weight:700;color:'+pc+'">'+(pitches||'—')+'</td></tr>';
-      }).join('')+
-      '<tr style="background:var(--bg3)"><td style="'+tdS+';text-align:left;color:var(--muted);font-size:0.78rem;text-transform:uppercase;letter-spacing:1px" colspan="8">Totals / Avg</td>'+
-      '<td style="'+tdS+';font-weight:800;color:var(--yellow)">'+totalPitches+' <span style="font-weight:400;color:var(--muted);font-size:0.78rem">('+avgPitches+'/g)</span></td></tr>'+
-      '</tbody></table></div>'+(i<results.length-1?'<hr style="border:none;border-top:1px solid var(--border);margin:0 0 28px">':'');
-  }).join('');
+      '<span>High: <strong style="color:'+maxColor+'">'+maxPitches+'</strong></span>'+
+      '<span style="color:var(--muted);width:14px;display:inline-block;text-align:center">'+(expanded?'▲':'▼')+'</span></div>':
+      '<span style="color:var(--muted);font-size:0.82rem;font-style:italic">No outings found</span>';
+    var rowHTML='<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 6px;border-bottom:1px solid var(--border);cursor:pointer" onclick="toggleWorkloadRow('+p.id+')">'+
+      '<div><span style="font-weight:800;font-size:0.95rem">'+p.name+'</span><span style="color:var(--muted);font-size:0.82rem;margin-left:10px">'+(p.team||'—')+'</span></div>'+
+      summaryHTML+'</div>';
+    var detailHTML=(expanded&&splits.length)?'<div style="padding:16px 6px 24px">'+workloadTable(splits)+'</div>':'';
+    return rowHTML+detailHTML;
+  }).join('')+'</div>';
 }
 
 async function loadLeaders() {
@@ -1131,7 +1263,8 @@ async function loadTransactions() {
 
 async function init() {
   document.getElementById('lastUpdated').textContent='Loading...';
-  await Promise.all(players.map(function(p){return fetchStats(p);}));
+  await Promise.all([Promise.all(players.map(function(p){return fetchStats(p);})), refreshLeagueContext()]);
+  applyLeagueAdjustedStats();
   renderAll();
   document.getElementById('lastUpdated').textContent=players.length?'Last updated: '+new Date().toLocaleString():'Add players to get started';
 }
