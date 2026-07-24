@@ -110,6 +110,7 @@
   <div class="tab" id="tab-recap" onclick="switchTab('recap')">Daily Recap</div>
   <div class="tab" id="tab-workload" onclick="switchTab('workload')">Workload</div>
   <div class="tab" id="tab-leaders" onclick="switchTab('leaders')">Leaderboards</div>
+  <div class="tab" id="tab-transactions" onclick="switchTab('transactions')">Transactions</div>
 </div>
 
 <div class="content">
@@ -237,6 +238,14 @@
       </div>
     </div>
     <div id="leaders-content"><div class="loading"><span class="spinner"></span>Loading...</div></div>
+  </div>
+
+  <div id="view-transactions" style="display:none">
+    <div class="meta-bar" style="margin-bottom:16px">
+      <span>Roster moves, promotions, IL stints &amp; more for your tracked players</span>
+      <button class="btn-ghost" onclick="loadTransactions()">↻ Refresh</button>
+    </div>
+    <div id="transactions-content"><div class="loading"><span class="spinner"></span>Loading...</div></div>
   </div>
 </div>
 
@@ -583,7 +592,7 @@ function updateCounts() {
 
 function switchTab(tab) {
   currentTab=tab;
-  ['pitchers','hitters','gamelog','recap','workload','leaders'].forEach(function(t) {
+  ['pitchers','hitters','gamelog','recap','workload','leaders','transactions'].forEach(function(t) {
     document.getElementById('tab-'+t).className='tab'+(t===tab?' active':'');
     document.getElementById('view-'+t).style.display=t===tab?'block':'none';
   });
@@ -591,6 +600,7 @@ function switchTab(tab) {
   if (tab==='recap') setRecapDay(1);
   if (tab==='workload') loadWorkload();
   if (tab==='leaders') loadLeaders();
+  if (tab==='transactions') loadTransactions();
 }
 
 async function doSearch(inline) {
@@ -1063,6 +1073,60 @@ async function loadLeaders() {
           '</tr>';
       }).join('')+'</tbody></table>';
   } catch(e) {box.innerHTML='<div class="empty-state"><h2>Failed to load leaderboard</h2></div>';}
+}
+
+async function loadTransactions() {
+  var box=document.getElementById('transactions-content');
+  if (!players.length) {box.innerHTML='<div class="empty-state"><h2>No players tracked yet</h2><p>Search for a player above to add them.</p></div>'; return;}
+  box.innerHTML='<div class="loading"><span class="spinner"></span>Loading transactions...</div>';
+  var today=new Date();
+  var isCurrentSeason=season>=today.getFullYear();
+  var startDate=season+'-01-01';
+  var endDate=isCurrentSeason?today.toISOString().slice(0,10):season+'-12-31';
+  try {
+    var results=await Promise.all(players.map(async function(p) {
+      try {
+        var url=API+'/transactions?playerId='+p.id+'&startDate='+startDate+'&endDate='+endDate;
+        var r=await proxiedFetch(url);
+        if (!r.ok) return [];
+        var d=await r.json();
+        return (d.transactions||[]).map(function(t){ t._playerLabel=p.name; t._playerType=p.type; return t; });
+      } catch(e) { return []; }
+    }));
+    var all=[].concat.apply([],results);
+    var seen={};
+    var deduped=all.filter(function(t){
+      var key=t.id||(t.person&&t.person.id)+'-'+t.date+'-'+t.description;
+      if (seen[key]) return false;
+      seen[key]=true; return true;
+    });
+    deduped.sort(function(a,b){
+      var da=a.date||a.effectiveDate||''; var db=b.date||b.effectiveDate||'';
+      return da<db?1:da>db?-1:0;
+    });
+    if (!deduped.length) {box.innerHTML='<div class="empty-state"><h2>No transactions found</h2><p>Nothing on record for your tracked players in '+season+'.</p></div>'; return;}
+    var thS='padding:10px 8px;background:var(--bg2);color:var(--muted);font-size:0.78rem;letter-spacing:1px;border-bottom:1px solid var(--border);text-align:left';
+    var tdS='padding:10px 8px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top';
+    box.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:0.85rem"><thead><tr>'+
+      '<th style="'+thS+';width:100px">Date</th>'+
+      '<th style="'+thS+'">Player</th>'+
+      '<th style="'+thS+'">Transaction</th>'+
+      '<th style="'+thS+'">From</th>'+
+      '<th style="'+thS+'">To</th>'+
+      '</tr></thead><tbody>'+
+      deduped.map(function(t){
+        var dateStr=t.date||t.effectiveDate||'—';
+        var fromTeam=t.fromTeam&&t.fromTeam.name?t.fromTeam.name:'—';
+        var toTeam=t.toTeam&&t.toTeam.name?t.toTeam.name:'—';
+        return '<tr>'+
+          '<td style="'+tdS+';color:var(--muted)">'+dateStr+'</td>'+
+          '<td style="'+tdS+';font-weight:700">'+t._playerLabel+'</td>'+
+          '<td style="'+tdS+'">'+(t.description||t.typeDesc||'—')+'</td>'+
+          '<td style="'+tdS+';color:var(--muted)">'+fromTeam+'</td>'+
+          '<td style="'+tdS+';color:var(--muted)">'+toTeam+'</td>'+
+          '</tr>';
+      }).join('')+'</tbody></table>';
+  } catch(e) { box.innerHTML='<div class="empty-state"><h2>Failed to load transactions</h2></div>'; }
 }
 
 async function init() {
