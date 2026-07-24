@@ -265,6 +265,7 @@
     </div>
     <div class="modal-tabs">
       <div class="modal-tab active" id="mtab-overview" onclick="switchModalTab('overview')">Overview</div>
+      <div class="modal-tab" id="mtab-bylevel" onclick="switchModalTab('bylevel')">By Level</div>
       <div class="modal-tab" id="mtab-charts" onclick="switchModalTab('charts')">Trend Charts</div>
     </div>
     <div class="modal-body" id="modalBody">Loading...</div>
@@ -276,6 +277,8 @@
 <script>
 var API = 'https://statsapi.mlb.com/api/v1';
 var SPORT_IDS = [1,11,12,13,14,15,16];
+var LEVEL_NAMES = {1:'MLB',11:'Triple-A',12:'Double-A',13:'High-A',14:'Single-A',15:'Rookie',16:'Rookie'};
+var levelSplitsCache = {};
 
 function proxiedFetch(url) { return fetch(url); }
 
@@ -852,6 +855,7 @@ async function openModal(id) {
   document.getElementById('playerModal').className='modal-overlay open';
   modalTab='overview';
   document.getElementById('mtab-overview').className='modal-tab active';
+  document.getElementById('mtab-bylevel').className='modal-tab';
   document.getElementById('mtab-charts').className='modal-tab';
   await renderModalOverview(p);
 }
@@ -962,12 +966,88 @@ function chartOpts() {
             y:{ticks:{color:'#aa7a5a'},grid:{color:'#3a2a1a'}}}};
 }
 
+async function fetchLevelSplits(p) {
+  var key=p.id+'-'+season+'-'+p.type;
+  if (levelSplitsCache[key]) return levelSplitsCache[key];
+  var group=p.type==='pitcher'?'pitching':'hitting';
+  var levels=[];
+  await Promise.all(SPORT_IDS.map(async function(sid){
+    try {
+      var r=await proxiedFetch(API+'/people/'+p.id+'/stats?stats=season&season='+season+'&group='+group+'&sportId='+sid);
+      if (!r.ok) return;
+      var d=await r.json();
+      var splits=d.stats&&d.stats[0]&&d.stats[0].splits?d.stats[0].splits:[];
+      if (!splits.length) return;
+      var teamName=(splits[splits.length-1].team&&splits[splits.length-1].team.name)||'—';
+      levels.push({sportId:sid,levelName:LEVEL_NAMES[sid]||('Level '+sid),teamName:teamName,splits:splits});
+    } catch(e) {}
+  }));
+  levels.sort(function(a,b){return SPORT_IDS.indexOf(a.sportId)-SPORT_IDS.indexOf(b.sportId);});
+  levelSplitsCache[key]=levels;
+  return levels;
+}
+
+async function renderModalByLevel(p) {
+  var box=document.getElementById('modalBody');
+  box.innerHTML='<div class="loading"><span class="spinner"></span>Loading level splits...</div>';
+  try {
+    var levels=await fetchLevelSplits(p);
+    if (!levels.length) {box.innerHTML='<div class="empty-state"><h2>No level data found</h2></div>'; return;}
+    var thS='padding:10px 8px;background:var(--bg2);color:var(--muted);font-size:0.78rem;letter-spacing:1px;border-bottom:1px solid var(--border);text-align:right';
+    var tdS='padding:10px 8px;border-bottom:1px solid var(--border);text-align:right';
+    var rows=levels.map(function(lvl){
+      var agg=aggregateSplits(lvl.splits,p.type);
+      var plusVal=null;
+      if (leagueContext) {
+        if (p.type==='pitcher') {
+          var eraNum=parseFloat(agg.era);
+          plusVal=(leagueContext.era&&!isNaN(eraNum)&&eraNum>0)?Math.round((leagueContext.era/eraNum)*100):null;
+        } else {
+          plusVal=(leagueContext.wOBA&&agg.wOBA!=null)?Math.round((agg.wOBA/leagueContext.wOBA)*100):null;
+        }
+      }
+      if (p.type==='pitcher') {
+        return '<tr>'+
+          '<td style="'+tdS+';text-align:left"><span style="font-weight:700">'+lvl.levelName+'</span></td>'+
+          '<td style="'+tdS+';text-align:left;color:var(--muted)">'+lvl.teamName+'</td>'+
+          '<td style="'+tdS+'">'+fmt(agg.g)+'</td><td style="'+tdS+'">'+fmt(agg.ip)+'</td>'+
+          '<td style="'+tdS+'">'+fmt(agg.era)+'</td><td style="'+tdS+'">'+fmt(agg.fip)+'</td>'+
+          '<td style="'+tdS+'">'+fmt(agg.whip)+'</td><td style="'+tdS+'">'+fmt(agg.so)+'</td>'+
+          '<td style="'+tdS+'">'+fmt(agg.bb)+'</td>'+
+          '<td style="'+tdS+';font-weight:700;color:'+statPlusColor(plusVal)+'">'+fmt(plusVal)+'</td></tr>';
+      } else {
+        return '<tr>'+
+          '<td style="'+tdS+';text-align:left"><span style="font-weight:700">'+lvl.levelName+'</span></td>'+
+          '<td style="'+tdS+';text-align:left;color:var(--muted)">'+lvl.teamName+'</td>'+
+          '<td style="'+tdS+'">'+fmt(agg.g)+'</td><td style="'+tdS+'">'+fmt(agg.ab)+'</td>'+
+          '<td style="'+tdS+'">'+fmt(agg.avg)+'</td><td style="'+tdS+'">'+fmt(agg.obp)+'</td>'+
+          '<td style="'+tdS+'">'+fmt(agg.slg)+'</td><td style="'+tdS+'">'+fmt(agg.ops)+'</td>'+
+          '<td style="'+tdS+'">'+fmt(agg.hr)+'</td><td style="'+tdS+'">'+fmt(agg.rbi)+'</td>'+
+          '<td style="'+tdS+';font-weight:700;color:'+statPlusColor(plusVal)+'">'+fmt(plusVal)+'</td></tr>';
+      }
+    }).join('');
+    var header=p.type==='pitcher'?
+      '<tr><th style="'+thS+';text-align:left">Level</th><th style="'+thS+';text-align:left">Team</th>'+
+      '<th style="'+thS+'">G</th><th style="'+thS+'">IP</th><th style="'+thS+'">ERA</th>'+
+      '<th style="'+thS+'">FIP</th><th style="'+thS+'">WHIP</th><th style="'+thS+'">SO</th>'+
+      '<th style="'+thS+'">BB</th><th style="'+thS+'">ERA+</th></tr>':
+      '<tr><th style="'+thS+';text-align:left">Level</th><th style="'+thS+';text-align:left">Team</th>'+
+      '<th style="'+thS+'">G</th><th style="'+thS+'">AB</th><th style="'+thS+'">AVG</th>'+
+      '<th style="'+thS+'">OBP</th><th style="'+thS+'">SLG</th><th style="'+thS+'">OPS</th>'+
+      '<th style="'+thS+'">HR</th><th style="'+thS+'">RBI</th><th style="'+thS+'">wRC+</th></tr>';
+    box.innerHTML='<div style="color:var(--muted);font-size:0.78rem;margin-bottom:12px">ERA+/wRC+ use the same blended, all-levels league baseline as elsewhere in the app — not level-specific.</div>'+
+      '<table style="width:100%;border-collapse:collapse;font-size:0.85rem"><thead>'+header+'</thead><tbody>'+rows+'</tbody></table>';
+  } catch(e) {box.innerHTML='<div class="empty-state"><h2>Failed to load level splits</h2></div>';}
+}
+
 function switchModalTab(tab) {
   modalTab=tab;
   document.getElementById('mtab-overview').className='modal-tab'+(tab==='overview'?' active':'');
+  document.getElementById('mtab-bylevel').className='modal-tab'+(tab==='bylevel'?' active':'');
   document.getElementById('mtab-charts').className='modal-tab'+(tab==='charts'?' active':'');
   Object.values(trendCharts).forEach(function(c){c.destroy();}); trendCharts={};
   if (tab==='overview') renderModalOverview(currentModalPlayer);
+  else if (tab==='bylevel') renderModalByLevel(currentModalPlayer);
   else renderModalCharts(currentModalPlayer);
 }
 
