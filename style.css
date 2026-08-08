@@ -1,0 +1,626 @@
+/* =============================================
+   8CTANE BASEBALL — PITCH INTELLIGENCE
+   ============================================= */
+:root {
+  --black:    #09090b;
+  --surface:  #111316;
+  --surface2: #1a1b1f;
+  --surface3: #222328;
+  --border:   #2c2d32;
+  --border2:  #3e3f45;
+  --cyan:     #1e9fd4;
+  --cyan-b:   #1680aa;
+  --cyan-dim: rgba(30,159,212,0.10);
+  --cyan-mid: rgba(30,159,212,0.25);
+  --text:     #e6e7e9;
+  --muted:    #72747c;
+  --muted2:   #4a4c54;
+  --danger:   #f04040;
+  --warn:     #f0a020;
+  --good:     #22c55e;
+  --ff: #378ADD; --st: #D85A30; --fs: #BA7517;
+  --fc: #534AB7; --cu: #1D9E75; --sl: #E24B4A;
+  --si: #888780;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--black);
+  color: var(--text);
+  font-family: 'Barlow', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- HEADER ---- */
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 200;
+  height: 56px;
+}
+.header-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.header-left { display: flex; align-items: center; gap: 12px; }
+.nav-logo { height: 28px; object-fit: contain; }
+.nav-divider { width: 1px; height: 20px; background: var(--border2); }
+.nav-product {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .1em;
+  color: var(--muted);
+}
+.header-right { display: flex; align-items: center; gap: 10px; }
+.mode-badge {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px; font-weight: 500;
+  color: var(--cyan);
+  border: 1px solid var(--cyan-mid);
+  padding: 3px 8px; border-radius: 3px;
+  letter-spacing: .06em;
+}
+
+/* ---- BUTTONS ---- */
+.btn-primary {
+  background: var(--cyan);
+  color: #fff;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700; font-size: 13px;
+  text-transform: uppercase; letter-spacing: .08em;
+  padding: 9px 24px; border-radius: 5px;
+  border: none; cursor: pointer;
+  transition: background .15s;
+}
+.btn-primary:hover { background: var(--cyan-b); }
+.btn-primary:disabled { opacity: .4; cursor: default; }
+.btn-primary.btn-sm { padding: 6px 16px; font-size: 12px; }
+.btn-ghost {
+  background: none;
+  color: var(--muted);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 600; font-size: 12px;
+  text-transform: uppercase; letter-spacing: .08em;
+  padding: 7px 14px; border-radius: 4px;
+  border: 1px solid var(--border2); cursor: pointer;
+  transition: all .15s;
+}
+.btn-ghost:hover { border-color: var(--cyan); color: var(--cyan); }
+
+/* ---- UPLOAD PAGE ---- */
+.upload-page {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+}
+.upload-hero {
+  max-width: 540px;
+  width: 100%;
+  text-align: center;
+}
+.hero-logo {
+  height: 60px;
+  object-fit: contain;
+  margin-bottom: 1.5rem;
+}
+.upload-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 36px; font-weight: 800;
+  letter-spacing: .02em; margin-bottom: .5rem;
+}
+.upload-sub {
+  font-size: 14px; color: var(--muted);
+  line-height: 1.7; margin-bottom: 2rem;
+}
+.drop-area {
+  border: 1.5px dashed var(--border2);
+  border-radius: 10px;
+  padding: 2.5rem 2rem;
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+  background: var(--surface);
+  display: flex; flex-direction: column;
+  align-items: center; gap: .5rem;
+}
+.drop-area:hover, .drop-area.dragging {
+  border-color: var(--cyan);
+  background: var(--cyan-dim);
+}
+.drop-icon { font-size: 36px; opacity: .35; }
+.drop-label {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 18px; font-weight: 700;
+  color: var(--text); margin-bottom: .25rem;
+}
+.drop-hint { font-size: 12px; color: var(--muted2); }
+.drop-status { font-size: 12px; color: var(--muted); font-family: 'DM Mono', monospace; }
+.upload-note {
+  font-size: 12px; color: var(--muted2);
+  margin-top: 1rem; line-height: 1.6;
+}
+.upload-note code {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px; color: var(--cyan);
+  background: var(--cyan-dim);
+  padding: 1px 5px; border-radius: 3px;
+}
+.upload-logo-wrap { margin-bottom: 1rem; }
+.multi-upload-grid {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.drop-sm { flex: 1; padding: 1.5rem 1rem; }
+.multi-vs {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 28px; font-weight: 800;
+  color: var(--muted2); flex-shrink: 0;
+}
+
+/* ---- REPORT TOOLBAR ---- */
+.report-toolbar {
+  max-width: 1100px; margin: 0 auto;
+  padding: .75rem 1.5rem;
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+/* ---- PLAYER HEADER ---- */
+.player-header {
+  max-width: 1100px; margin: 0 auto 1rem;
+  padding: 1.25rem 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex; align-items: flex-start; justify-content: space-between;
+  flex-wrap: wrap; gap: 1rem;
+}
+.player-name {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 30px; font-weight: 800;
+  letter-spacing: .02em; line-height: 1;
+}
+.player-meta {
+  font-size: 12px; color: var(--muted);
+  margin-top: 4px; display: flex; gap: 10px; flex-wrap: wrap;
+}
+.player-meta-item { color: var(--cyan); }
+.kpi-strip { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+.kpi { text-align: right; }
+.kpi-val {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 26px; font-weight: 700; line-height: 1;
+}
+.kpi-lbl {
+  font-size: 10px; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .08em;
+  margin-top: 1px;
+}
+
+/* ---- TABS ---- */
+.tabs-wrap {
+  max-width: 1100px; margin: 0 auto 1.5rem;
+  padding: 0 1.5rem;
+}
+.tabs {
+  display: flex; gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 3px;
+}
+.tab {
+  flex: 1; text-align: center;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700; font-size: 12px;
+  text-transform: uppercase; letter-spacing: .08em;
+  padding: 7px 4px; border-radius: 5px;
+  border: none; background: none;
+  color: var(--muted); cursor: pointer;
+  transition: all .15s;
+}
+.tab:hover { color: var(--text); }
+.tab.active { background: var(--cyan); color: #fff; }
+
+/* ---- REPORT BODY ---- */
+.report-body {
+  max-width: 1100px; margin: 0 auto;
+  padding: 0 1.5rem 3rem;
+}
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ---- SECTION ---- */
+.section { margin-bottom: 1.5rem; }
+.section-hd {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .14em;
+  color: var(--cyan);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1rem;
+}
+
+/* ---- DATA TABLE ---- */
+.table-scroll { overflow-x: auto; }
+.data-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 13px; min-width: 600px;
+}
+.data-table th {
+  text-align: left;
+  font-family: 'DM Mono', monospace;
+  font-size: 10px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: .1em;
+  color: var(--muted);
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.data-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tbody tr:hover td { background: var(--surface2); }
+
+/* ---- PITCH CHIP ---- */
+.pitch-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px; font-weight: 700; letter-spacing: .03em;
+}
+.pitch-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+/* ---- VALUE COLORS ---- */
+.mono { font-family: 'DM Mono', monospace; }
+.v-good { color: var(--good); font-family: 'DM Mono', monospace; }
+.v-warn { color: var(--warn); font-family: 'DM Mono', monospace; }
+.v-bad  { color: var(--danger); font-family: 'DM Mono', monospace; }
+.v-num  { font-family: 'DM Mono', monospace; }
+
+/* ---- USAGE BAR ---- */
+.usage-bar-wrap { display: flex; align-items: center; gap: 8px; }
+.usage-bar-bg { flex: 1; height: 4px; background: var(--border); border-radius: 2px; min-width: 50px; }
+.usage-bar-fill { height: 4px; border-radius: 2px; transition: width .3s; }
+
+/* ---- CHART GRID ---- */
+.chart-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+}
+.chart-card-title {
+  font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .1em;
+  color: var(--muted); margin-bottom: .75rem;
+  font-family: 'Barlow Condensed', sans-serif;
+}
+.chart-wrap { position: relative; width: 100%; }
+.chart-footnote {
+  font-size: 11px; color: var(--muted2);
+  margin-top: .5rem; font-family: 'DM Mono', monospace;
+}
+
+/* ---- COUNT GRID ---- */
+.count-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.count-cell {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: .625rem .75rem;
+}
+.count-lbl {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px; color: var(--cyan);
+  margin-bottom: 6px; font-weight: 500;
+}
+.count-row {
+  display: flex; align-items: center;
+  gap: 5px; margin-bottom: 3px; font-size: 10px;
+}
+.count-bar-bg { flex: 1; height: 4px; background: var(--border); border-radius: 2px; }
+.count-bar-fill { height: 4px; border-radius: 2px; }
+.count-total {
+  font-size: 9px; color: var(--muted2);
+  font-family: 'DM Mono', monospace;
+  margin-top: 5px;
+}
+
+/* ---- HARD CONTACT TABLE ---- */
+.ev-pill {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px; padding: 2px 7px;
+  border-radius: 3px; font-weight: 500;
+  display: inline-block;
+}
+.ev-elite { background: rgba(240,64,64,.15); color: var(--danger); }
+.ev-hard  { background: rgba(240,160,32,.15); color: var(--warn); }
+.ev-ok    { background: rgba(34,197,94,.12);  color: var(--good); }
+
+/* ---- INSIGHT GRID ---- */
+.insight-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .75rem;
+}
+.insight-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--cyan);
+  border-radius: 6px;
+  padding: .875rem 1rem;
+}
+.insight-card.warn   { border-left-color: var(--warn); }
+.insight-card.danger { border-left-color: var(--danger); }
+.insight-card.good   { border-left-color: var(--good); }
+.insight-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px; font-weight: 700;
+  margin-bottom: 4px;
+}
+.insight-body { font-size: 12px; color: var(--muted); line-height: 1.65; }
+
+/* ---- SEQ RECS ---- */
+.seq-row {
+  display: flex; gap: 1.25rem;
+  padding: .75rem 0;
+  border-bottom: 1px solid var(--border);
+  align-items: flex-start;
+}
+.seq-row:last-child { border-bottom: none; }
+.seq-count {
+  min-width: 130px; flex-shrink: 0;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px; color: var(--cyan);
+  padding-top: 2px;
+}
+.seq-text { font-size: 13px; color: var(--muted); line-height: 1.65; }
+
+/* ---- SPLITS ---- */
+.splits-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+/* ---- FOOTER ---- */
+.site-footer {
+  border-top: 1px solid var(--border);
+  padding: 1rem 1.5rem;
+  display: flex; align-items: center; gap: 1rem;
+  font-size: 11px; color: var(--muted2);
+  font-family: 'DM Mono', monospace;
+  margin-top: auto;
+}
+
+/* ---- MOVEMENT STAT CARDS ---- */
+.mov-cards-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.mov-pitch-row {
+  display: flex;
+  align-items: center;
+  padding: .875rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  gap: 1.5rem;
+}
+.mov-pitch-row:last-child { border-bottom: none; }
+.mov-pitch-row:hover { background: var(--surface2); }
+.mov-pitch-label {
+  display: flex;
+  align-items: center;
+  min-width: 110px;
+  flex-shrink: 0;
+}
+.mov-pitch-name {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: .02em;
+}
+.mov-stat-group {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  flex: 1;
+  gap: 0;
+}
+.mov-stat {
+  text-align: center;
+  padding: .25rem .5rem;
+  border-left: 1px solid var(--border);
+}
+.mov-stat:first-child { border-left: none; }
+.mov-stat-val {
+  font-family: 'DM Mono', monospace;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.2;
+}
+.mov-stat-lbl {
+  font-size: 9px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-top: 3px;
+  white-space: nowrap;
+}
+/* Header row for stat cards */
+.mov-header-row {
+  display: flex;
+  align-items: center;
+  padding: .4rem 1.25rem;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  gap: 1.5rem;
+}
+.mov-header-label {
+  min-width: 110px;
+  flex-shrink: 0;
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  color: var(--muted2);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+}
+.mov-header-stats {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  flex: 1;
+}
+.mov-header-stat {
+  text-align: center;
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  color: var(--cyan);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  padding: 0 .5rem;
+  border-left: 1px solid var(--border);
+}
+.mov-header-stat:first-child { border-left: none; }
+
+/* ---- MLB BASELINE DELTAS ---- */
+.mlb-avg {
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  color: var(--muted);
+}
+.delta-good {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--good);
+  margin-left: 4px;
+}
+.delta-bad {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--danger);
+  margin-left: 4px;
+}
+.delta.neutral {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--muted2);
+  margin-left: 4px;
+}
+
+/* ---- EMPTY STATE ---- */
+.empty-state {
+  text-align: center; padding: 3rem 1rem;
+  color: var(--muted); font-size: 13px;
+}
+
+/* ---- PRINT HEADER (logo, print-only) ---- */
+.print-header { display: none; }
+
+/* ---- PRINT ---- */
+@media print {
+  header, .report-toolbar, .tabs-wrap, .site-footer { display: none !important; }
+  .print-header {
+    display: flex !important;
+    align-items: center;
+    gap: .75rem;
+    padding: 0 0 1rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .print-header img { height: 32px; }
+  .print-header span { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--muted); letter-spacing: .02em; }
+  .tab-panel { display: block !important; page-break-inside: avoid; }
+  body { background: var(--black) !important; color: var(--text) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .player-header, .chart-card, .count-cell, .insight-card { border-color: var(--border) !important; background: var(--surface) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .section-hd { color: var(--cyan) !important; }
+}
+
+/* ---- RESPONSIVE ---- */
+@media (max-width: 700px) {
+  .chart-grid-2, .splits-grid, .insight-grid { grid-template-columns: 1fr; }
+  .count-grid { grid-template-columns: repeat(3, 1fr); }
+  .kpi-strip { gap: 1rem; }
+  .kpi-val { font-size: 20px; }
+  .multi-upload-grid { flex-direction: column; }
+}
+
+/* ---- LOCATIONS TAB ---- */
+.loc-zone-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:.875rem; display:inline-block; }
+.arsenal-rec { background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:.75rem 1rem; font-size:13px; color:var(--muted); line-height:1.6; }
+.arsenal-rec.keep    { border-left:3px solid #1D9E75; }
+.arsenal-rec.develop { border-left:3px solid #00d4ff; }
+.arsenal-rec.add     { border-left:3px solid #e91e8c; }
+.arsenal-rec.remove  { border-left:3px solid #BA7517; }
+.arsenal-rec strong  { color:var(--text); }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---- SHAPE-MATCHED BASELINE TAG ---- */
+.shape-match-tag {
+  display: inline-block;
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: .02em;
+  color: var(--cyan, #00d4ff);
+  background: rgba(0,212,255,0.08);
+  border: 1px solid rgba(0,212,255,0.25);
+  border-radius: 3px;
+  padding: 1px 5px;
+  cursor: help;
+}
+
+.mlb-comp-tag {
+  margin-top: 3px;
+  font-size: 10px;
+  color: var(--muted);
+  cursor: help;
+}
+
+.arsenal-comp-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--cyan, #00d4ff);
+  border-radius: 6px;
+  padding: .75rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 13px;
+}
+.arsenal-comp-lbl { color: var(--muted); }
+.arsenal-comp-chip {
+  background: rgba(0,212,255,0.1);
+  border: 1px solid rgba(0,212,255,0.3);
+  border-radius: 20px;
+  padding: 2px 10px;
+  color: var(--text);
+  font-weight: 600;
+}
